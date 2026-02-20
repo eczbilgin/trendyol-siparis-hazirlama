@@ -24,11 +24,14 @@ def analiz_yap(df):
 
     urun_sutunu = df.iloc[:, bn_idx]
     adet_sutunu = df.iloc[:, bs_idx]
+    siparis_sutunu = df.iloc[:, c_idx]
 
     urun_ozeti = {}
+    siparis_detay = {}  # Sipariş numarasına göre ürünleri grupla
 
     for i in range(len(df)):
         urun = str(urun_sutunu.iloc[i]).strip()
+        siparis_no = str(siparis_sutunu.iloc[i]).strip()
 
         if urun == '' or urun == 'nan' or pd.isna(urun_sutunu.iloc[i]):
             continue
@@ -42,6 +45,7 @@ def analiz_yap(df):
         except (ValueError, TypeError):
             continue
 
+        # Ürün özeti
         if urun not in urun_ozeti:
             urun_ozeti[urun] = {
                 'toplam_adet': 0,
@@ -57,6 +61,24 @@ def analiz_yap(df):
             urun_ozeti[urun]['paketler'][adet] += 1
         else:
             urun_ozeti[urun]['paketler'][adet] = 1
+
+        # Sipariş detayı (karma siparişler için)
+        if siparis_no and siparis_no != 'nan':
+            if siparis_no not in siparis_detay:
+                siparis_detay[siparis_no] = []
+            siparis_detay[siparis_no].append({
+                'urun': urun,
+                'adet': adet
+            })
+
+    # Karma siparişleri bul (birden fazla ürün içeren)
+    karma_siparisler = []
+    for siparis_no, urunler in siparis_detay.items():
+        if len(urunler) > 1:
+            karma_siparisler.append({
+                'siparis_no': siparis_no,
+                'urunler': urunler
+            })
 
     # Sonuçları liste olarak döndür
     sonuclar = []
@@ -85,10 +107,11 @@ def analiz_yap(df):
     ozet = {
         'urun_cesidi': len(urun_ozeti),
         'toplam_siparis': toplam_siparis,
-        'toplam_urun': toplam_urun
+        'toplam_urun': toplam_urun,
+        'karma_siparis_sayisi': len(karma_siparisler)
     }
 
-    return {'urunler': sonuclar, 'ozet': ozet}, None
+    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler}, None
 
 @app.route('/')
 def index():

@@ -361,6 +361,12 @@
 
             <div id="productList"></div>
 
+            <!-- Karma Siparişler -->
+            <div class="summary-card" id="karmaSection" style="display:none; border-left: 5px solid #e67e22;">
+                <h3>🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)</h3>
+                <div id="karmaList"></div>
+            </div>
+
             <!-- Yazdırma için kompakt tablo -->
             <div class="print-header" id="printHeader"></div>
             <table class="print-table" id="printTable">
@@ -475,6 +481,33 @@
                     printTableBody.appendChild(row);
                     siraNo++;
                 });
+
+                // Karma siparişleri göster
+                const karmaSection = document.getElementById('karmaSection');
+                const karmaList = document.getElementById('karmaList');
+                karmaList.innerHTML = '';
+
+                if (data.karma_siparisler && data.karma_siparisler.length > 0) {
+                    karmaSection.style.display = 'block';
+
+                    data.karma_siparisler.forEach(siparis => {
+                        const karmaCard = document.createElement('div');
+                        karmaCard.style.cssText = 'background:#fff8e7;border-radius:10px;padding:15px;margin:10px 0;border-left:4px solid #e67e22;';
+
+                        let urunlerHTML = '';
+                        siparis.urunler.forEach(u => {
+                            urunlerHTML += `<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>${u.urun}</strong> - ${u.adet} adet</div>`;
+                        });
+
+                        karmaCard.innerHTML = `
+                            <div style="font-weight:bold;color:#e67e22;margin-bottom:10px;">📦 Sipariş No: ${siparis.siparis_no}</div>
+                            ${urunlerHTML}
+                        `;
+                        karmaList.appendChild(karmaCard);
+                    });
+                } else {
+                    karmaSection.style.display = 'none';
+                }
 
                 results.classList.add('show');
 
