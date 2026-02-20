@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo ============================================
 echo    TRENDYOL SIPARIS HAZIRLAMA
 echo ============================================
@@ -10,6 +11,6 @@ echo Bu pencereyi KAPATMAYIN!
 echo.
 
 start http://localhost:5000
-python "%~dp0app.py"
+python app.py
 
 pause
