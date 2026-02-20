@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trendyol Sipariş Hazırlama</title>
+    <title>Sipariş Hazırlama</title>
     <style>
         * {
             margin: 0;
@@ -301,7 +301,7 @@
                 padding: 0;
                 margin: 0;
             }
-            .upload-area, .print-btn, .analyze-btn, .summary-card, .product-card, h1 {
+            .upload-area, .print-btn, .analyze-btn, .summary-card, .product-card, h1, .tabs, .genel-summary {
                 display: none !important;
             }
             .print-table {
@@ -341,12 +341,173 @@
         .print-header {
             display: none;
         }
+
+        /* Sekme stilleri */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 5px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #2c3e50;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Genel Sipariş stilleri */
+        .barcode-input-area {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .barcode-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            text-align: center;
+            outline: none;
+        }
+
+        .barcode-input:focus {
+            border-color: #2ecc71;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.3);
+        }
+
+        .scanned-list {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .scanned-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 8px;
+            margin: 5px 0;
+            border-left: 4px solid #3498db;
+        }
+
+        .scanned-item .barcode {
+            font-family: monospace;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .scanned-item .product-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .scanned-item .quantity {
+            background: #3498db;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        .remove-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .genel-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            color: white;
+        }
+
+        .genel-summary h4 {
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .genel-product-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            margin: 5px 0;
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .clear-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .scan-count {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>TRENDYOL SİPARİŞ HAZIRLAMA</h1>
+        <h1>SİPARİŞ HAZIRLAMA</h1>
 
+        <!-- Sekmeler -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('trendyol')">🛒 Trendyol Siparişleri</button>
+            <button class="tab-btn" onclick="switchTab('genel')">📦 Genel Siparişler</button>
+        </div>
+
+        <!-- Trendyol Sekmesi -->
+        <div id="trendyol-tab" class="tab-content active">
         <div class="upload-area">
             <h2>Excel Dosyası Yükle</h2>
             <p style="color: #666; margin-bottom: 20px;">Trendyol sipariş Excel dosyanızı (.xlsx) seçin</p>
@@ -411,9 +572,77 @@
                 <tbody id="printTableBody"></tbody>
             </table>
         </div>
+        </div><!-- Trendyol sekmesi sonu -->
+
+        <!-- Genel Sipariş Sekmesi -->
+        <div id="genel-tab" class="tab-content">
+            <div class="upload-area">
+                <h2>Genel Sipariş Hazırlama</h2>
+                <p style="color: #666; margin-bottom: 20px;">Önce Excel dosyasını yükleyin, sonra barkod okutun</p>
+
+                <div class="file-input-wrapper">
+                    <input type="file" id="genelFileInput" class="file-input" accept=".xlsx">
+                    <label for="genelFileInput" class="file-label">📁 Excel Dosyası Seç</label>
+                </div>
+                <div class="file-name" id="genelFileName"></div>
+
+                <!-- Barkod Okutma Alanı -->
+                <div class="barcode-input-area" id="barcodeArea" style="display:none;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px;">📷 Barkod Okutun</h3>
+                    <input type="text" id="barcodeInput" class="barcode-input" placeholder="Barkodu okutun veya yazın..." autofocus>
+                    <div class="scan-count" id="scanCount">Okutulan: 0 sipariş</div>
+
+                    <!-- Okutulan Barkodlar Listesi -->
+                    <div class="scanned-list" id="scannedList"></div>
+
+                    <button class="clear-btn" onclick="clearScannedList()">🗑️ Listeyi Temizle</button>
+                </div>
+            </div>
+
+            <!-- Genel Sipariş Özeti -->
+            <div class="genel-summary" id="genelSummary" style="display:none;">
+                <h4>📊 HAZIRLANACAK ÜRÜNLER</h4>
+                <div id="genelProductList"></div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.3);">
+                    <strong>Toplam: <span id="genelTotalCount">0</span> adet ürün</strong>
+                </div>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button class="print-btn" onclick="printGenelSiparis()">🖨️ Yazdır</button>
+                </div>
+            </div>
+
+            <!-- Genel Sipariş Yazdırma Tablosu -->
+            <div class="print-header" id="genelPrintHeader"></div>
+            <table class="print-table" id="genelPrintTable">
+                <thead>
+                    <tr>
+                        <th style="width:60%">ÜRÜN ADI</th>
+                        <th style="width:20%">TOPLAM ADET</th>
+                        <th style="width:20%">SİPARİŞ SAYISI</th>
+                    </tr>
+                </thead>
+                <tbody id="genelPrintTableBody"></tbody>
+            </table>
+        </div><!-- Genel sipariş sekmesi sonu -->
     </div>
 
     <script>
+        // Sekme geçiş fonksiyonu
+        function switchTab(tabName) {
+            // Tüm sekmeleri gizle
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Seçili sekmeyi göster
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // ==================== TRENDYOL SİPARİŞLERİ ====================
         const fileInput = document.getElementById('fileInput');
         const fileName = document.getElementById('fileName');
         const analyzeBtn = document.getElementById('analyzeBtn');
@@ -585,6 +814,223 @@
                 alert('Bir hata oluştu: ' + error.message);
             }
         });
+
+        // ==================== GENEL SİPARİŞLER ====================
+        const genelFileInput = document.getElementById('genelFileInput');
+        const genelFileName = document.getElementById('genelFileName');
+        const barcodeArea = document.getElementById('barcodeArea');
+        const barcodeInput = document.getElementById('barcodeInput');
+        const scannedList = document.getElementById('scannedList');
+        const genelSummary = document.getElementById('genelSummary');
+        const genelProductList = document.getElementById('genelProductList');
+        const scanCount = document.getElementById('scanCount');
+
+        let excelData = {}; // Barkod -> {urun, adet} eşleştirmesi
+        let scannedBarcodes = []; // Okutulan barkodlar
+
+        // Excel dosyası yüklendiğinde
+        genelFileInput.addEventListener('change', async function() {
+            if (this.files.length > 0) {
+                genelFileName.textContent = '📄 ' + this.files[0].name;
+
+                const formData = new FormData();
+                formData.append('file', this.files[0]);
+
+                try {
+                    const response = await fetch('/genel-analiz', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    // Excel verilerini sakla
+                    excelData = data.barkodlar;
+                    barcodeArea.style.display = 'block';
+                    barcodeInput.focus();
+
+                    alert(`Excel yüklendi! ${Object.keys(excelData).length} farklı barkod bulundu.`);
+
+                } catch (error) {
+                    alert('Hata: ' + error.message);
+                }
+            }
+        });
+
+        // Barkod okutulduğunda
+        barcodeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const barcode = this.value.trim();
+                if (barcode === '') return;
+
+                // Daha önce okutulmuş mu kontrol et - sessizce geç
+                const dahaOnceOkutuldu = scannedBarcodes.some(item => item.barcode === barcode);
+                if (dahaOnceOkutuldu) {
+                    this.value = '';
+                    this.focus();
+                    return;
+                }
+
+                if (excelData[barcode]) {
+                    // Barkod bulundu - birden fazla ürün olabilir
+                    const urunler = excelData[barcode];
+                    scannedBarcodes.push({
+                        barcode: barcode,
+                        urunler: urunler // [{urun, adet}, {urun, adet}, ...]
+                    });
+
+                    updateScannedList();
+                    updateGenelSummary();
+                } else {
+                    alert('⚠️ Barkod bulunamadı: ' + barcode);
+                }
+
+                this.value = '';
+                this.focus();
+            }
+        });
+
+        // Okutulan barkodlar listesini güncelle
+        function updateScannedList() {
+            scannedList.innerHTML = '';
+            scanCount.textContent = `Okutulan: ${scannedBarcodes.length} sipariş`;
+
+            scannedBarcodes.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'scanned-item';
+                div.style.flexDirection = 'column';
+                div.style.alignItems = 'stretch';
+
+                // Birden fazla ürün olabilir
+                let urunlerHTML = '';
+                let toplamAdet = 0;
+                item.urunler.forEach(u => {
+                    urunlerHTML += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #eee;">
+                        <span>${u.urun}</span>
+                        <span class="quantity" style="font-size:0.85em;padding:2px 10px;">${u.adet} adet</span>
+                    </div>`;
+                    toplamAdet += u.adet;
+                });
+
+                div.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div class="barcode" style="font-weight:bold;">${item.barcode}</div>
+                        <button class="remove-btn" onclick="removeScanned(${index})">×</button>
+                    </div>
+                    <div style="font-size:0.9em;">${urunlerHTML}</div>
+                `;
+                scannedList.appendChild(div);
+            });
+        }
+
+        // Barkodu listeden çıkar
+        function removeScanned(index) {
+            scannedBarcodes.splice(index, 1);
+            updateScannedList();
+            updateGenelSummary();
+        }
+
+        // Listeyi temizle
+        function clearScannedList() {
+            if (confirm('Tüm okutulan barkodları silmek istediğinize emin misiniz?')) {
+                scannedBarcodes = [];
+                updateScannedList();
+                updateGenelSummary();
+            }
+        }
+
+        // Genel sipariş özetini güncelle
+        function updateGenelSummary() {
+            if (scannedBarcodes.length === 0) {
+                genelSummary.style.display = 'none';
+                return;
+            }
+
+            genelSummary.style.display = 'block';
+
+            // Ürünleri grupla
+            const urunGruplari = {};
+            scannedBarcodes.forEach(item => {
+                // Her barkodda birden fazla ürün olabilir
+                item.urunler.forEach(u => {
+                    if (!urunGruplari[u.urun]) {
+                        urunGruplari[u.urun] = {
+                            toplam: 0,
+                            siparisSayisi: 0
+                        };
+                    }
+                    urunGruplari[u.urun].toplam += u.adet;
+                    urunGruplari[u.urun].siparisSayisi += 1;
+                });
+            });
+
+            // Listeyi oluştur
+            genelProductList.innerHTML = '';
+            let toplamAdet = 0;
+
+            Object.keys(urunGruplari).sort().forEach(urun => {
+                const bilgi = urunGruplari[urun];
+                toplamAdet += bilgi.toplam;
+
+                const div = document.createElement('div');
+                div.className = 'genel-product-item';
+                div.innerHTML = `
+                    <span>${urun}</span>
+                    <span><strong>${bilgi.toplam}</strong> adet (${bilgi.siparisSayisi} sipariş)</span>
+                `;
+                genelProductList.appendChild(div);
+            });
+
+            document.getElementById('genelTotalCount').textContent = toplamAdet;
+
+            // Yazdırma tablosunu güncelle
+            updateGenelPrintTable(urunGruplari, toplamAdet);
+        }
+
+        // Genel sipariş yazdırma tablosunu güncelle
+        function updateGenelPrintTable(urunGruplari, toplamAdet) {
+            const printHeader = document.getElementById('genelPrintHeader');
+            const printBody = document.getElementById('genelPrintTableBody');
+
+            const tarih = new Date().toLocaleDateString('tr-TR');
+            const siparisSayisi = scannedBarcodes.length;
+            printHeader.innerHTML = `GENEL SİPARİŞ LİSTESİ - ${tarih}<br>Okutulan Sipariş: ${siparisSayisi} | Toplam: ${Object.keys(urunGruplari).length} ürün, ${toplamAdet} adet`;
+
+            printBody.innerHTML = '';
+
+            Object.keys(urunGruplari).sort().forEach(urun => {
+                const bilgi = urunGruplari[urun];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${urun}</td>
+                    <td><strong>${bilgi.toplam}</strong></td>
+                    <td>${bilgi.siparisSayisi}</td>
+                `;
+                printBody.appendChild(row);
+            });
+        }
+
+        // Genel sipariş yazdır
+        function printGenelSiparis() {
+            // Geçici olarak trendyol tablosunu gizle, genel tabloyu göster
+            document.getElementById('printTable').style.display = 'none';
+            document.getElementById('printHeader').style.display = 'none';
+            document.getElementById('genelPrintTable').style.display = 'table';
+            document.getElementById('genelPrintHeader').style.display = 'block';
+
+            window.print();
+
+            // Geri al
+            document.getElementById('printTable').style.display = '';
+            document.getElementById('printHeader').style.display = '';
+            document.getElementById('genelPrintTable').style.display = 'none';
+            document.getElementById('genelPrintHeader').style.display = 'none';
+        }
     </script>
 </body>
 </html>

@@ -182,5 +182,65 @@ def analiz():
     except Exception as e:
         return jsonify({'error': f'Hata: {str(e)}'})
 
+@app.route('/genel-analiz', methods=['POST'])
+def genel_analiz():
+    """Genel sipariş için Excel'den barkod verilerini çıkarır"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Dosya seçilmedi!'})
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Dosya seçilmedi!'})
+
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': 'Sadece .xlsx dosyaları desteklenir!'})
+
+    try:
+        df = pd.read_excel(file, header=None)
+
+        # Sütun indeksleri: AN=barkod, BN=ürün ismi, BS=adet
+        an_idx = sutun_indeksi('AN')  # Barkod
+        bn_idx = sutun_indeksi('BN')  # Ürün adı
+        bs_idx = sutun_indeksi('BS')  # Adet
+
+        if df.shape[1] <= max(an_idx, bn_idx, bs_idx):
+            return jsonify({'error': 'Excel dosyasında yeterli sütun yok!'})
+
+        barkod_sutunu = df.iloc[:, an_idx]
+        urun_sutunu = df.iloc[:, bn_idx]
+        adet_sutunu = df.iloc[:, bs_idx]
+
+        barkodlar = {}
+
+        for i in range(len(df)):
+            barkod = str(barkod_sutunu.iloc[i]).strip()
+            urun = str(urun_sutunu.iloc[i]).strip()
+
+            if barkod == '' or barkod == 'nan' or pd.isna(barkod_sutunu.iloc[i]):
+                continue
+
+            # Başlık satırını atla
+            if 'Barkod' in barkod or 'barkod' in barkod:
+                continue
+
+            try:
+                adet = int(float(adet_sutunu.iloc[i]))
+            except (ValueError, TypeError):
+                adet = 1  # Varsayılan 1 adet
+
+            # Bir barkodda birden fazla ürün olabilir
+            if barkod not in barkodlar:
+                barkodlar[barkod] = []
+
+            barkodlar[barkod].append({
+                'urun': urun,
+                'adet': adet
+            })
+
+        return jsonify({'barkodlar': barkodlar})
+
+    except Exception as e:
+        return jsonify({'error': f'Hata: {str(e)}'})
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
