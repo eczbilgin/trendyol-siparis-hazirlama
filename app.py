@@ -73,12 +73,42 @@ def analiz_yap(df):
 
     # Karma siparişleri bul (birden fazla ürün içeren)
     karma_siparisler = []
+    karma_urun_adetleri = {}  # Karma siparişlerdeki ürün adetlerini takip et
+
     for siparis_no, urunler in siparis_detay.items():
         if len(urunler) > 1:
             karma_siparisler.append({
                 'siparis_no': siparis_no,
                 'urunler': urunler
             })
+            # Karma siparişlerdeki ürün adetlerini topla
+            for u in urunler:
+                urun_adi = u['urun']
+                adet = u['adet']
+                if urun_adi not in karma_urun_adetleri:
+                    karma_urun_adetleri[urun_adi] = {
+                        'toplam_adet': 0,
+                        'siparis_sayisi': 0,
+                        'paketler': {}
+                    }
+                karma_urun_adetleri[urun_adi]['toplam_adet'] += adet
+                karma_urun_adetleri[urun_adi]['siparis_sayisi'] += 1
+                if adet in karma_urun_adetleri[urun_adi]['paketler']:
+                    karma_urun_adetleri[urun_adi]['paketler'][adet] += 1
+                else:
+                    karma_urun_adetleri[urun_adi]['paketler'][adet] = 1
+
+    # Karma siparişlerdeki adetleri ana özetten çıkar
+    for urun_adi, karma_bilgi in karma_urun_adetleri.items():
+        if urun_adi in urun_ozeti:
+            urun_ozeti[urun_adi]['toplam_adet'] -= karma_bilgi['toplam_adet']
+            urun_ozeti[urun_adi]['siparis_sayisi'] -= karma_bilgi['siparis_sayisi']
+            # Paketlerden de çıkar
+            for adet, sayi in karma_bilgi['paketler'].items():
+                if adet in urun_ozeti[urun_adi]['paketler']:
+                    urun_ozeti[urun_adi]['paketler'][adet] -= sayi
+                    if urun_ozeti[urun_adi]['paketler'][adet] <= 0:
+                        del urun_ozeti[urun_adi]['paketler'][adet]
 
     # Sonuçları liste olarak döndür
     sonuclar = []
@@ -87,15 +117,21 @@ def analiz_yap(df):
 
     for urun in sorted(urun_ozeti.keys()):
         bilgi = urun_ozeti[urun]
+
+        # Tekli siparişi kalmayan ürünleri atla
+        if bilgi['toplam_adet'] <= 0:
+            continue
+
         toplam_siparis += bilgi['siparis_sayisi']
         toplam_urun += bilgi['toplam_adet']
 
         paket_listesi = []
         for adet in sorted(bilgi['paketler'].keys()):
-            paket_listesi.append({
-                'adet': adet,
-                'sayi': bilgi['paketler'][adet]
-            })
+            if bilgi['paketler'][adet] > 0:
+                paket_listesi.append({
+                    'adet': adet,
+                    'sayi': bilgi['paketler'][adet]
+                })
 
         sonuclar.append({
             'urun': urun,
@@ -104,10 +140,16 @@ def analiz_yap(df):
             'paketler': paket_listesi
         })
 
+    # Karma siparişlerdeki toplam ürün sayısını hesapla
+    karma_toplam_urun = sum(
+        sum(u['adet'] for u in siparis['urunler'])
+        for siparis in karma_siparisler
+    )
+
     ozet = {
-        'urun_cesidi': len(urun_ozeti),
-        'toplam_siparis': toplam_siparis,
-        'toplam_urun': toplam_urun,
+        'urun_cesidi': len([u for u in urun_ozeti.keys() if urun_ozeti[u]['toplam_adet'] > 0]),
+        'toplam_siparis': toplam_siparis + len(karma_siparisler),
+        'toplam_urun': toplam_urun + karma_toplam_urun,
         'karma_siparis_sayisi': len(karma_siparisler)
     }
 

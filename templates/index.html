@@ -285,26 +285,56 @@
         }
 
         @media print {
+            @page {
+                size: A5 portrait;
+                margin: 5mm;
+            }
             body {
                 background: white !important;
-                padding: 5px !important;
-                font-size: 10px;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 8px;
+                width: 138mm;
+            }
+            .container {
+                max-width: 100%;
+                padding: 0;
+                margin: 0;
             }
             .upload-area, .print-btn, .analyze-btn, .summary-card, .product-card, h1 {
                 display: none !important;
             }
             .print-table {
                 display: table !important;
+                width: 100%;
+                font-size: 7px;
+            }
+            .print-table th, .print-table td {
+                padding: 3px 4px;
+                font-size: 7px;
+            }
+            .print-table th {
+                padding: 4px;
+                font-size: 8px;
             }
             .print-header {
                 display: block !important;
                 text-align: center;
-                font-size: 14px;
+                font-size: 10px;
                 font-weight: bold;
-                margin-bottom: 10px;
+                margin-bottom: 5px;
             }
             .results {
                 display: block !important;
+            }
+            /* Paket tablosu A5 için küçült */
+            .print-table td table {
+                font-size: 6px !important;
+            }
+            .print-table td table th,
+            .print-table td table td {
+                padding: 1px 2px !important;
+                font-size: 6px !important;
             }
         }
 
@@ -504,6 +534,44 @@
                             ${urunlerHTML}
                         `;
                         karmaList.appendChild(karmaCard);
+                    });
+
+                    // Karma siparişleri yazdırma tablosuna ekle
+                    // Önce ayırıcı satır ekle
+                    const separatorRow = document.createElement('tr');
+                    separatorRow.innerHTML = `
+                        <td colspan="4" style="background:#e67e22;color:white;text-align:center;font-weight:bold;padding:10px;">
+                            🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)
+                        </td>
+                    `;
+                    printTableBody.appendChild(separatorRow);
+
+                    // Her karma sipariş için satır ekle
+                    data.karma_siparisler.forEach(siparis => {
+                        const karmaRow = document.createElement('tr');
+                        karmaRow.style.backgroundColor = '#fff8e7';
+
+                        // Ürün adlarını alt alta listele
+                        let urunAdlariHTML = siparis.urunler.map(u => u.urun).join('<br>');
+
+                        // Toplam ürün sayısı
+                        let toplamAdet = siparis.urunler.reduce((sum, u) => sum + u.adet, 0);
+
+                        // Paket detayları - her ürün için adet bilgisi
+                        let paketDetayHTML = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Ürün</th><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Adet</th></tr>';
+                        siparis.urunler.forEach(u => {
+                            paketDetayHTML += `<tr><td style="border:1px solid #666;padding:2px;">${u.urun}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${u.adet}</td></tr>`;
+                        });
+                        paketDetayHTML += '</table>';
+
+                        karmaRow.innerHTML = `
+                            <td style="background:#e67e22;color:white;font-weight:bold;">${siraNo}</td>
+                            <td style="font-size:10px;">${urunAdlariHTML}</td>
+                            <td><strong>${toplamAdet}</strong></td>
+                            <td>${paketDetayHTML}</td>
+                        `;
+                        printTableBody.appendChild(karmaRow);
+                        siraNo++;
                     });
                 } else {
                     karmaSection.style.display = 'none';
