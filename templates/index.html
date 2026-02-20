@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trendyol Sipariş Hazırlama</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .upload-area {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .upload-area h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            display: inline-block;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .file-label:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .file-name {
+            margin-top: 15px;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            border-radius: 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .analyze-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(46, 204, 113, 0.4);
+        }
+
+        .analyze-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .summary-card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border-radius: 10px;
+            color: white;
+            margin: 10px;
+            min-width: 150px;
+        }
+
+        .stat-box .number {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        .stat-box .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid #e74c3c;
+        }
+
+        .product-name {
+            color: #2c3e50;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .product-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-badge {
+            background: #ecf0f1;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #34495e;
+        }
+
+        .info-badge strong {
+            color: #e74c3c;
+        }
+
+        .packages {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .packages-title {
+            color: #27ae60;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .package-item {
+            display: inline-block;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .print-btn {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.3s;
+        }
+
+        .print-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Yazdırma için kompakt tablo görünümü */
+        .print-table {
+            display: none;
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin-top: 20px;
+        }
+
+        .print-table th, .print-table td {
+            border: 1px solid #333;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 11px;
+        }
+
+        .print-table th {
+            background: #333;
+            color: white;
+            font-weight: bold;
+        }
+
+        .print-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        @media print {
+            body {
+                background: white !important;
+                padding: 5px !important;
+                font-size: 10px;
+            }
+            .upload-area, .print-btn, .analyze-btn, .summary-card, .product-card, h1 {
+                display: none !important;
+            }
+            .print-table {
+                display: table !important;
+            }
+            .print-header {
+                display: block !important;
+                text-align: center;
+                font-size: 14px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .results {
+                display: block !important;
+            }
+        }
+
+        .print-header {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TRENDYOL SİPARİŞ HAZIRLAMA</h1>
+
+        <div class="upload-area">
+            <h2>Excel Dosyası Yükle</h2>
+            <p style="color: #666; margin-bottom: 20px;">Trendyol sipariş Excel dosyanızı (.xlsx) seçin</p>
+
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx">
+                <label for="fileInput" class="file-label">📁 Dosya Seç</label>
+            </div>
+
+            <div class="file-name" id="fileName"></div>
+
+            <br>
+            <button class="analyze-btn" id="analyzeBtn" disabled>🔍 ANALİZ ET</button>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px; color: #666;">Analiz ediliyor...</p>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="summary-card">
+                <h3>📊 GENEL ÖZET</h3>
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <div class="number" id="urunCesidi">0</div>
+                        <div class="label">Ürün Çeşidi</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" id="toplamSiparis">0</div>
+                        <div class="label">Toplam Sipariş</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" id="toplamUrun">0</div>
+                        <div class="label">Toplam Ürün</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="print-btn" onclick="window.print()">🖨️ Yazdır</button>
+                </div>
+            </div>
+
+            <div id="productList"></div>
+
+            <!-- Yazdırma için kompakt tablo -->
+            <div class="print-header" id="printHeader"></div>
+            <table class="print-table" id="printTable">
+                <thead>
+                    <tr>
+                        <th style="width:5%">#</th>
+                        <th style="width:45%">ÜRÜN ADI</th>
+                        <th style="width:10%">TOPLAM</th>
+                        <th style="width:40%">PAKETLER</th>
+                    </tr>
+                </thead>
+                <tbody id="printTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                fileName.textContent = '📄 ' + this.files[0].name;
+                analyzeBtn.disabled = false;
+            } else {
+                fileName.textContent = '';
+                analyzeBtn.disabled = true;
+            }
+        });
+
+        analyzeBtn.addEventListener('click', async function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            loading.classList.add('show');
+            results.classList.remove('show');
+            analyzeBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/analiz', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                loading.classList.remove('show');
+                analyzeBtn.disabled = false;
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                // Özet bilgileri güncelle
+                document.getElementById('urunCesidi').textContent = data.ozet.urun_cesidi;
+                document.getElementById('toplamSiparis').textContent = data.ozet.toplam_siparis;
+                document.getElementById('toplamUrun').textContent = data.ozet.toplam_urun;
+
+                // Ürün listesini oluştur
+                const productList = document.getElementById('productList');
+                const printTableBody = document.getElementById('printTableBody');
+                const printHeader = document.getElementById('printHeader');
+                productList.innerHTML = '';
+                printTableBody.innerHTML = '';
+
+                // Yazdırma başlığı
+                const tarih = new Date().toLocaleDateString('tr-TR');
+                printHeader.innerHTML = `SİPARİŞ HAZIRLAMA LİSTESİ - ${tarih}<br>Toplam: ${data.ozet.urun_cesidi} ürün, ${data.ozet.toplam_urun} adet`;
+
+                let siraNo = 1;
+                data.urunler.forEach(urun => {
+                    // Ekran kartı
+                    const card = document.createElement('div');
+                    card.className = 'product-card';
+
+                    let paketlerHTML = '';
+                    let paketlerText = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#eee;">Ürün Adedi</th><th style="border:1px solid #666;padding:2px;background:#eee;">Paket</th></tr>';
+                    urun.paketler.forEach(p => {
+                        paketlerHTML += `<span class="package-item">${p.sayi} adet ${p.adet}'li</span>`;
+                        paketlerText += `<tr><td style="border:1px solid #666;padding:2px;text-align:center;">${p.adet}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${p.sayi}</td></tr>`;
+                    });
+                    paketlerText += '</table>';
+
+                    card.innerHTML = `
+                        <div class="product-name">📦 ${urun.urun}</div>
+                        <div class="product-info">
+                            <span class="info-badge">Toplam: <strong>${urun.toplam} adet</strong></span>
+                            <span class="info-badge">Sipariş: <strong>${urun.siparis_sayisi}</strong></span>
+                        </div>
+                        <div class="packages">
+                            <div class="packages-title">🏷️ Paket Hazırlama:</div>
+                            ${paketlerHTML}
+                        </div>
+                    `;
+                    productList.appendChild(card);
+
+                    // Yazdırma tablosu satırı
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${siraNo}</td>
+                        <td>${urun.urun}</td>
+                        <td><strong>${urun.toplam}</strong></td>
+                        <td>${paketlerText}</td>
+                    `;
+                    printTableBody.appendChild(row);
+                    siraNo++;
+                });
+
+                results.classList.add('show');
+
+            } catch (error) {
+                loading.classList.remove('show');
+                analyzeBtn.disabled = false;
+                alert('Bir hata oluştu: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
