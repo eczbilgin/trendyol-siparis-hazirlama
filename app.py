@@ -18,13 +18,17 @@ def analiz_yap(df):
     bn_idx = sutun_indeksi('BN')  # Ürün adı
     bs_idx = sutun_indeksi('BS')  # Sipariş adedi
     c_idx = sutun_indeksi('C')    # Sipariş numarası
+    cg_idx = sutun_indeksi('CG')  # Platform (Trendyol filtresi)
+    s_idx = sutun_indeksi('S')    # Durum (Kargoya verilecek filtresi)
 
-    if df.shape[1] <= max(bn_idx, bs_idx, c_idx):
+    if df.shape[1] <= max(bn_idx, bs_idx, c_idx, cg_idx):
         return None, "Excel dosyasında yeterli sütun yok!"
 
     urun_sutunu = df.iloc[:, bn_idx]
     adet_sutunu = df.iloc[:, bs_idx]
     siparis_sutunu = df.iloc[:, c_idx]
+    platform_sutunu = df.iloc[:, cg_idx]
+    durum_sutunu = df.iloc[:, s_idx]
 
     urun_ozeti = {}
     siparis_detay = {}  # Sipariş numarasına göre ürünleri grupla
@@ -38,6 +42,16 @@ def analiz_yap(df):
 
         # Başlık satırını atla
         if urun == 'Ürün İsmi':
+            continue
+
+        # CG sütunu: Sadece Trendyol ve trendyol.micro siparişleri
+        platform = str(platform_sutunu.iloc[i]).strip().lower()
+        if 'trendyol' not in platform and 'trendyol.micro' not in platform:
+            continue
+
+        # S sütunu: Sadece "Kargoya verilecek" durumundakiler
+        durum = str(durum_sutunu.iloc[i]).strip().lower()
+        if 'kargoya verilecek' not in durum:
             continue
 
         try:
@@ -202,13 +216,17 @@ def genel_analiz():
         an_idx = sutun_indeksi('AN')  # Barkod
         bn_idx = sutun_indeksi('BN')  # Ürün adı
         bs_idx = sutun_indeksi('BS')  # Adet
+        cg_idx = sutun_indeksi('CG')  # Platform (Trendyol filtresi)
+        s_idx = sutun_indeksi('S')    # Durum (Kargoya verilecek filtresi)
 
-        if df.shape[1] <= max(an_idx, bn_idx, bs_idx):
+        if df.shape[1] <= max(an_idx, bn_idx, bs_idx, cg_idx):
             return jsonify({'error': 'Excel dosyasında yeterli sütun yok!'})
 
         barkod_sutunu = df.iloc[:, an_idx]
         urun_sutunu = df.iloc[:, bn_idx]
         adet_sutunu = df.iloc[:, bs_idx]
+        platform_sutunu = df.iloc[:, cg_idx]
+        durum_sutunu = df.iloc[:, s_idx]
 
         barkodlar = {}
 
@@ -221,6 +239,16 @@ def genel_analiz():
 
             # Başlık satırını atla
             if 'Barkod' in barkod or 'barkod' in barkod:
+                continue
+
+            # CG sütunu: Sadece Trendyol ve trendyol.micro siparişleri
+            platform = str(platform_sutunu.iloc[i]).strip().lower()
+            if 'trendyol' not in platform and 'trendyol.micro' not in platform:
+                continue
+
+            # S sütunu: Sadece "Kargoya verilecek" durumundakiler
+            durum = str(durum_sutunu.iloc[i]).strip().lower()
+            if 'kargoya verilecek' not in durum:
                 continue
 
             try:
