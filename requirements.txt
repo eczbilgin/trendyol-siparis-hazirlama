@@ -1,3 +1,6 @@
 flask
 pandas
 openpyxl
+selenium
+python-dotenv
+webdriver-manager

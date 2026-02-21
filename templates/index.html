@@ -494,6 +494,109 @@
             color: #666;
             margin-top: 10px;
         }
+
+        /* Entegra stilleri */
+        .entegra-login {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .entegra-login input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
+        .entegra-login input:focus {
+            border-color: #3498db;
+        }
+
+        .entegra-btn {
+            background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            width: 100%;
+        }
+
+        .entegra-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 20px rgba(230, 126, 34, 0.4);
+        }
+
+        .entegra-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .entegra-status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .entegra-status.calisiyor {
+            display: block;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+        }
+
+        .entegra-status.tamamlandi {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #28a745;
+        }
+
+        .entegra-status.hata {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #dc3545;
+        }
+
+        .entegra-debug {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f1f1f1;
+            border-radius: 5px;
+            font-size: 0.85em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .veya-ayirici {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #999;
+        }
+
+        .veya-ayirici::before,
+        .veya-ayirici::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .veya-ayirici span {
+            padding: 0 15px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -509,6 +612,20 @@
         <!-- Trendyol Sekmesi -->
         <div id="trendyol-tab" class="tab-content active">
         <div class="upload-area">
+            <h2>Entegra'dan Otomatik Çek</h2>
+            <p style="color: #666; margin-bottom: 15px;">Entegra panelinden siparişleri otomatik indir</p>
+
+            <div style="margin-top: 15px;">
+                <button class="entegra-btn" id="entegraBtn" onclick="entegraCek()">🌐 Entegra'dan Çek</button>
+            </div>
+
+            <div class="entegra-status" id="entegraStatus">
+                <div id="entegraStatusText"></div>
+                <div class="entegra-debug" id="entegraDebug" style="display:none;"></div>
+            </div>
+
+            <div class="veya-ayirici"><span>VEYA</span></div>
+
             <h2>Excel Dosyası Yükle</h2>
             <p style="color: #666; margin-bottom: 20px;">Trendyol sipariş Excel dosyanızı (.xlsx) seçin</p>
 
@@ -642,6 +759,132 @@
             event.target.classList.add('active');
         }
 
+        // ==================== ENTEGRA OTOMATİK ÇEK ====================
+        let entegraDurumInterval = null;
+
+        async function entegraCek() {
+            const btn = document.getElementById('entegraBtn');
+            const status = document.getElementById('entegraStatus');
+            const statusText = document.getElementById('entegraStatusText');
+            const debug = document.getElementById('entegraDebug');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Bağlanıyor...';
+            status.className = 'entegra-status calisiyor';
+            status.style.display = 'block';
+            statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;"></div> Entegra paneline bağlanılıyor, tarayıcı açılacak...';
+            debug.style.display = 'none';
+
+            try {
+                const response = await fetch('/entegra-cek', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    status.className = 'entegra-status hata';
+                    statusText.textContent = data.error;
+                    btn.disabled = false;
+                    btn.textContent = '🌐 Entegra\'dan Çek';
+                    return;
+                }
+
+                // Durum kontrolü başlat
+                entegraDurumKontrol();
+
+            } catch (error) {
+                status.className = 'entegra-status hata';
+                statusText.textContent = 'Bağlantı hatası: ' + error.message;
+                btn.disabled = false;
+                btn.textContent = '🌐 Entegra\'dan Çek';
+            }
+        }
+
+        function entegraDurumKontrol() {
+            if (entegraDurumInterval) clearInterval(entegraDurumInterval);
+
+            entegraDurumInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/entegra-durum');
+                    const data = await response.json();
+
+                    const status = document.getElementById('entegraStatus');
+                    const statusText = document.getElementById('entegraStatusText');
+                    const debug = document.getElementById('entegraDebug');
+                    const btn = document.getElementById('entegraBtn');
+
+                    if (data.durum === 'calisiyor') {
+                        status.className = 'entegra-status calisiyor';
+                        statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;"></div> ' + data.mesaj;
+                    } else if (data.durum === 'tamamlandi') {
+                        clearInterval(entegraDurumInterval);
+                        status.className = 'entegra-status tamamlandi';
+                        statusText.textContent = '✅ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🌐 Entegra\'dan Çek';
+
+                        // Otomatik analiz yap
+                        entegraAnaliz();
+                    } else if (data.durum === 'hata') {
+                        clearInterval(entegraDurumInterval);
+                        status.className = 'entegra-status hata';
+                        statusText.textContent = '❌ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🌐 Entegra\'dan Çek';
+
+                        // Debug bilgisi göster
+                        if (data.detay) {
+                            debug.style.display = 'block';
+                            let debugHTML = '<strong>Sayfa Bilgisi:</strong><br>';
+                            debugHTML += `URL: ${data.detay.url}<br>`;
+                            debugHTML += `Başlık: ${data.detay.title}<br>`;
+                            if (data.detay.linkler && data.detay.linkler.length > 0) {
+                                debugHTML += '<br><strong>Sayfadaki Linkler:</strong><br>';
+                                data.detay.linkler.forEach(l => {
+                                    debugHTML += `- ${l.text} (${l.href})<br>`;
+                                });
+                            }
+                            if (data.detay.butonlar && data.detay.butonlar.length > 0) {
+                                debugHTML += '<br><strong>Butonlar:</strong><br>';
+                                data.detay.butonlar.forEach(b => {
+                                    debugHTML += `- ${b}<br>`;
+                                });
+                            }
+                            debug.innerHTML = debugHTML;
+                        }
+                    }
+                } catch (error) {
+                    // Sessizce devam et
+                }
+            }, 2000);
+        }
+
+        async function entegraAnaliz() {
+            loading.classList.add('show');
+
+            try {
+                const response = await fetch('/entegra-analiz', { method: 'POST' });
+                const data = await response.json();
+
+                loading.classList.remove('show');
+
+                if (data.error) {
+                    alert('Analiz hatası: ' + data.error);
+                    return;
+                }
+
+                // Mevcut analiz fonksiyonuyla aynı sonuçları göster
+                showAnalysisResults(data);
+
+            } catch (error) {
+                loading.classList.remove('show');
+                alert('Analiz hatası: ' + error.message);
+            }
+        }
+
         // ==================== TRENDYOL SİPARİŞLERİ ====================
         const fileInput = document.getElementById('fileInput');
         const fileName = document.getElementById('fileName');
@@ -686,127 +929,7 @@
                     return;
                 }
 
-                // Özet bilgileri güncelle
-                document.getElementById('urunCesidi').textContent = data.ozet.urun_cesidi;
-                document.getElementById('toplamSiparis').textContent = data.ozet.toplam_siparis;
-                document.getElementById('toplamUrun').textContent = data.ozet.toplam_urun;
-
-                // Ürün listesini oluştur
-                const productList = document.getElementById('productList');
-                const printTableBody = document.getElementById('printTableBody');
-                const printHeader = document.getElementById('printHeader');
-                productList.innerHTML = '';
-                printTableBody.innerHTML = '';
-
-                // Yazdırma başlığı
-                const tarih = new Date().toLocaleDateString('tr-TR');
-                printHeader.innerHTML = `SİPARİŞ HAZIRLAMA LİSTESİ - ${tarih}<br>Toplam: ${data.ozet.urun_cesidi} ürün, ${data.ozet.toplam_urun} adet`;
-
-                let siraNo = 1;
-                data.urunler.forEach(urun => {
-                    // Ekran kartı
-                    const card = document.createElement('div');
-                    card.className = 'product-card';
-
-                    let paketlerHTML = '';
-                    let paketlerText = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#eee;">Ürün Adedi</th><th style="border:1px solid #666;padding:2px;background:#eee;">Paket</th></tr>';
-                    urun.paketler.forEach(p => {
-                        paketlerHTML += `<span class="package-item">${p.sayi} adet ${p.adet}'li</span>`;
-                        paketlerText += `<tr><td style="border:1px solid #666;padding:2px;text-align:center;">${p.adet}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${p.sayi}</td></tr>`;
-                    });
-                    paketlerText += '</table>';
-
-                    card.innerHTML = `
-                        <div class="product-name">📦 ${urun.urun}</div>
-                        <div class="product-info">
-                            <span class="info-badge">Toplam: <strong>${urun.toplam} adet</strong></span>
-                            <span class="info-badge">Sipariş: <strong>${urun.siparis_sayisi}</strong></span>
-                        </div>
-                        <div class="packages">
-                            <div class="packages-title">🏷️ Paket Hazırlama:</div>
-                            ${paketlerHTML}
-                        </div>
-                    `;
-                    productList.appendChild(card);
-
-                    // Yazdırma tablosu satırı
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${siraNo}</td>
-                        <td>${urun.urun}</td>
-                        <td><strong>${urun.toplam}</strong></td>
-                        <td>${paketlerText}</td>
-                    `;
-                    printTableBody.appendChild(row);
-                    siraNo++;
-                });
-
-                // Karma siparişleri göster
-                const karmaSection = document.getElementById('karmaSection');
-                const karmaList = document.getElementById('karmaList');
-                karmaList.innerHTML = '';
-
-                if (data.karma_siparisler && data.karma_siparisler.length > 0) {
-                    karmaSection.style.display = 'block';
-
-                    data.karma_siparisler.forEach(siparis => {
-                        const karmaCard = document.createElement('div');
-                        karmaCard.style.cssText = 'background:#fff8e7;border-radius:10px;padding:15px;margin:10px 0;border-left:4px solid #e67e22;';
-
-                        let urunlerHTML = '';
-                        siparis.urunler.forEach(u => {
-                            urunlerHTML += `<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>${u.urun}</strong> - ${u.adet} adet</div>`;
-                        });
-
-                        karmaCard.innerHTML = `
-                            <div style="font-weight:bold;color:#e67e22;margin-bottom:10px;">📦 Sipariş No: ${siparis.siparis_no}</div>
-                            ${urunlerHTML}
-                        `;
-                        karmaList.appendChild(karmaCard);
-                    });
-
-                    // Karma siparişleri yazdırma tablosuna ekle
-                    // Önce ayırıcı satır ekle
-                    const separatorRow = document.createElement('tr');
-                    separatorRow.innerHTML = `
-                        <td colspan="4" style="background:#e67e22;color:white;text-align:center;font-weight:bold;padding:10px;">
-                            🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)
-                        </td>
-                    `;
-                    printTableBody.appendChild(separatorRow);
-
-                    // Her karma sipariş için satır ekle
-                    data.karma_siparisler.forEach(siparis => {
-                        const karmaRow = document.createElement('tr');
-                        karmaRow.style.backgroundColor = '#fff8e7';
-
-                        // Ürün adlarını alt alta listele
-                        let urunAdlariHTML = siparis.urunler.map(u => u.urun).join('<br>');
-
-                        // Toplam ürün sayısı
-                        let toplamAdet = siparis.urunler.reduce((sum, u) => sum + u.adet, 0);
-
-                        // Paket detayları - her ürün için adet bilgisi
-                        let paketDetayHTML = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Ürün</th><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Adet</th></tr>';
-                        siparis.urunler.forEach(u => {
-                            paketDetayHTML += `<tr><td style="border:1px solid #666;padding:2px;">${u.urun}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${u.adet}</td></tr>`;
-                        });
-                        paketDetayHTML += '</table>';
-
-                        karmaRow.innerHTML = `
-                            <td style="background:#e67e22;color:white;font-weight:bold;">${siraNo}</td>
-                            <td style="font-size:10px;">${urunAdlariHTML}</td>
-                            <td><strong>${toplamAdet}</strong></td>
-                            <td>${paketDetayHTML}</td>
-                        `;
-                        printTableBody.appendChild(karmaRow);
-                        siraNo++;
-                    });
-                } else {
-                    karmaSection.style.display = 'none';
-                }
-
-                results.classList.add('show');
+                showAnalysisResults(data);
 
             } catch (error) {
                 loading.classList.remove('show');
@@ -814,6 +937,122 @@
                 alert('Bir hata oluştu: ' + error.message);
             }
         });
+
+        // ==================== ANALİZ SONUÇLARINI GÖSTER ====================
+        function showAnalysisResults(data) {
+            // Özet bilgileri güncelle
+            document.getElementById('urunCesidi').textContent = data.ozet.urun_cesidi;
+            document.getElementById('toplamSiparis').textContent = data.ozet.toplam_siparis;
+            document.getElementById('toplamUrun').textContent = data.ozet.toplam_urun;
+
+            // Ürün listesini oluştur
+            const productList = document.getElementById('productList');
+            const printTableBody = document.getElementById('printTableBody');
+            const printHeader = document.getElementById('printHeader');
+            productList.innerHTML = '';
+            printTableBody.innerHTML = '';
+
+            // Yazdırma başlığı
+            const tarih = new Date().toLocaleDateString('tr-TR');
+            printHeader.innerHTML = `SİPARİŞ HAZIRLAMA LİSTESİ - ${tarih}<br>Toplam: ${data.ozet.urun_cesidi} ürün, ${data.ozet.toplam_urun} adet`;
+
+            let siraNo = 1;
+            data.urunler.forEach(urun => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+
+                let paketlerHTML = '';
+                let paketlerText = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#eee;">Ürün Adedi</th><th style="border:1px solid #666;padding:2px;background:#eee;">Paket</th></tr>';
+                urun.paketler.forEach(p => {
+                    paketlerHTML += `<span class="package-item">${p.sayi} adet ${p.adet}'li</span>`;
+                    paketlerText += `<tr><td style="border:1px solid #666;padding:2px;text-align:center;">${p.adet}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${p.sayi}</td></tr>`;
+                });
+                paketlerText += '</table>';
+
+                card.innerHTML = `
+                    <div class="product-name">📦 ${urun.urun}</div>
+                    <div class="product-info">
+                        <span class="info-badge">Toplam: <strong>${urun.toplam} adet</strong></span>
+                        <span class="info-badge">Sipariş: <strong>${urun.siparis_sayisi}</strong></span>
+                    </div>
+                    <div class="packages">
+                        <div class="packages-title">🏷️ Paket Hazırlama:</div>
+                        ${paketlerHTML}
+                    </div>
+                `;
+                productList.appendChild(card);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${siraNo}</td>
+                    <td>${urun.urun}</td>
+                    <td><strong>${urun.toplam}</strong></td>
+                    <td>${paketlerText}</td>
+                `;
+                printTableBody.appendChild(row);
+                siraNo++;
+            });
+
+            // Karma siparişleri göster
+            const karmaSection = document.getElementById('karmaSection');
+            const karmaList = document.getElementById('karmaList');
+            karmaList.innerHTML = '';
+
+            if (data.karma_siparisler && data.karma_siparisler.length > 0) {
+                karmaSection.style.display = 'block';
+
+                data.karma_siparisler.forEach(siparis => {
+                    const karmaCard = document.createElement('div');
+                    karmaCard.style.cssText = 'background:#fff8e7;border-radius:10px;padding:15px;margin:10px 0;border-left:4px solid #e67e22;';
+
+                    let urunlerHTML = '';
+                    siparis.urunler.forEach(u => {
+                        urunlerHTML += `<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>${u.urun}</strong> - ${u.adet} adet</div>`;
+                    });
+
+                    karmaCard.innerHTML = `
+                        <div style="font-weight:bold;color:#e67e22;margin-bottom:10px;">📦 Sipariş No: ${siparis.siparis_no}</div>
+                        ${urunlerHTML}
+                    `;
+                    karmaList.appendChild(karmaCard);
+                });
+
+                const separatorRow = document.createElement('tr');
+                separatorRow.innerHTML = `
+                    <td colspan="4" style="background:#e67e22;color:white;text-align:center;font-weight:bold;padding:10px;">
+                        🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)
+                    </td>
+                `;
+                printTableBody.appendChild(separatorRow);
+
+                data.karma_siparisler.forEach(siparis => {
+                    const karmaRow = document.createElement('tr');
+                    karmaRow.style.backgroundColor = '#fff8e7';
+
+                    let urunAdlariHTML = siparis.urunler.map(u => u.urun).join('<br>');
+                    let toplamAdet = siparis.urunler.reduce((sum, u) => sum + u.adet, 0);
+
+                    let paketDetayHTML = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Ürün</th><th style="border:1px solid #666;padding:2px;background:#f5d6a8;">Adet</th></tr>';
+                    siparis.urunler.forEach(u => {
+                        paketDetayHTML += `<tr><td style="border:1px solid #666;padding:2px;">${u.urun}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${u.adet}</td></tr>`;
+                    });
+                    paketDetayHTML += '</table>';
+
+                    karmaRow.innerHTML = `
+                        <td style="background:#e67e22;color:white;font-weight:bold;">${siraNo}</td>
+                        <td style="font-size:10px;">${urunAdlariHTML}</td>
+                        <td><strong>${toplamAdet}</strong></td>
+                        <td>${paketDetayHTML}</td>
+                    `;
+                    printTableBody.appendChild(karmaRow);
+                    siraNo++;
+                });
+            } else {
+                karmaSection.style.display = 'none';
+            }
+
+            results.classList.add('show');
+        }
 
         // ==================== GENEL SİPARİŞLER ====================
         const genelFileInput = document.getElementById('genelFileInput');
