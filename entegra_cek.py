@@ -2,6 +2,7 @@
 import os
 import time
 import glob
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -145,8 +146,124 @@ def siparislere_git(driver):
     return False, "Siparişler sayfası bulunamadı."
 
 
+def tarih_filtrele(driver):
+    """Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık → Ara"""
+    durum_guncelle('Detayli Filtreleme butonuna tiklaniyor...')
+    wait = WebDriverWait(driver, 15)
+    time.sleep(2)
+
+    # 1. "Detaylı Filtreleme" butonuna tıkla
+    try:
+        detayli_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Detayl')]")))
+        detayli_btn.click()
+        time.sleep(2)
+    except:
+        # Alternatif selector dene
+        try:
+            detayli_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Detayl') and contains(text(), 'Filtreleme')]")
+            detayli_btn.click()
+            time.sleep(2)
+        except:
+            return False, "Detaylı Filtreleme butonu bulunamadı."
+
+    # 2. "Tarih Filtresi" butonuna tıkla
+    durum_guncelle('Tarih Filtresi seciliyor...')
+    try:
+        tarih_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Tarih Filtresi')]")))
+        tarih_btn.click()
+        time.sleep(1)
+    except:
+        try:
+            tarih_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Tarih Filtresi')]")
+            tarih_btn.click()
+            time.sleep(1)
+        except:
+            pass  # Zaten açık olabilir
+
+    # 3. "Sipariş Tarihi" checkbox'ını işaretle
+    durum_guncelle('Siparis Tarihi seciliyor...')
+    try:
+        # Checkbox'ı bul ve tıkla
+        siparis_tarihi_cb = driver.find_element(By.XPATH, "//input[@type='checkbox' and following-sibling::*[contains(text(), 'Sipari')] or preceding-sibling::*[contains(text(), 'Sipari')]]")
+        if not siparis_tarihi_cb.is_selected():
+            siparis_tarihi_cb.click()
+            time.sleep(1)
+    except:
+        try:
+            # Label'a tıklayarak checkbox'ı işaretle
+            label = driver.find_element(By.XPATH, "//*[contains(text(), 'Sipariş Tarihi') or contains(text(), 'Siparis Tarihi')]")
+            label.click()
+            time.sleep(1)
+        except:
+            pass
+
+    # 4. Tarihleri ayarla (1 hafta öncesi - bugün)
+    durum_guncelle('Tarih araligi ayarlaniyor...')
+    bugun = datetime.now()
+    bir_hafta_once = bugun - timedelta(days=7)
+
+    baslangic_tarih = bir_hafta_once.strftime('%d.%m.%Y')
+    bitis_tarih = bugun.strftime('%d.%m.%Y')
+
+    # Tarih input'larını bul ve doldur
+    try:
+        # Sipariş Tarihi satırındaki input'ları bul
+        tarih_inputs = driver.find_elements(By.XPATH, "//input[contains(@class, 'date') or @type='text']")
+
+        # İlk iki tarih input'u genellikle başlangıç ve bitiş
+        date_inputs = []
+        for inp in tarih_inputs:
+            try:
+                placeholder = inp.get_attribute('placeholder') or ''
+                value = inp.get_attribute('value') or ''
+                if '.' in placeholder or '.' in value or 'date' in (inp.get_attribute('class') or '').lower():
+                    date_inputs.append(inp)
+            except:
+                continue
+
+        if len(date_inputs) >= 2:
+            # Başlangıç tarihi
+            date_inputs[0].clear()
+            date_inputs[0].send_keys(baslangic_tarih)
+            time.sleep(0.5)
+
+            # Bitiş tarihi
+            date_inputs[1].clear()
+            date_inputs[1].send_keys(bitis_tarih)
+            time.sleep(0.5)
+    except Exception as e:
+        durum_guncelle(f'Tarih ayarlanamadi: {str(e)}')
+
+    # 5. "Ara" butonuna tıkla (yeşil buton)
+    durum_guncelle('Arama yapiliyor...')
+    time.sleep(1)
+    try:
+        # Yeşil Ara butonu
+        ara_btn = driver.find_element(By.XPATH, "//button[contains(@class, 'btn-success') or contains(@class, 'green')]//i[contains(@class, 'search')]/parent::button | //button[contains(@class, 'btn-success')]")
+        ara_btn.click()
+        time.sleep(3)
+    except:
+        try:
+            # Alternatif: search icon'lu buton
+            ara_btn = driver.find_element(By.XPATH, "//button[.//i[contains(@class, 'search')]]")
+            ara_btn.click()
+            time.sleep(3)
+        except:
+            try:
+                # Son çare: ilk yeşil buton
+                ara_btn = driver.find_element(By.CSS_SELECTOR, "button.btn-success, button.btn-primary")
+                ara_btn.click()
+                time.sleep(3)
+            except:
+                return False, "Ara butonu bulunamadı."
+
+    durum_guncelle('Filtreleme tamamlandi, siparisler yukleniyor...')
+    time.sleep(2)
+    return True, "Tarih filtresi uygulandı."
+
+
 def excel_indir(driver):
-    """Adım 3-4: Toplu İşlemler → Ayrıntılı Excel → İndir"""
+    """Adım 4-5: Toplu İşlemler → Ayrıntılı Excel → İndir"""
     durum_guncelle('Toplu Islemler butonuna tiklaniyor...')
     wait = WebDriverWait(driver, 15)
 
@@ -289,7 +406,13 @@ def excel_cek(email, sifre, headless=False):
             sayfa = sayfa_bilgisi_al(driver)
             return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'siparisler'}
 
-        # Adım 3-4: Toplu İşlemler → Ayrıntılı Excel → İndir
+        # Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık
+        basarili, mesaj = tarih_filtrele(driver)
+        if not basarili:
+            sayfa = sayfa_bilgisi_al(driver)
+            return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'tarih_filtrele'}
+
+        # Adım 4-5: Toplu İşlemler → Ayrıntılı Excel → İndir
         basarili, sonuc = excel_indir(driver)
         if not basarili:
             sayfa = sayfa_bilgisi_al(driver)
