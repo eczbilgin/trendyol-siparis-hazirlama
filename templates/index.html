@@ -517,6 +517,34 @@
             border-color: #3498db;
         }
 
+        .durum-filtre-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .durum-filtre-btn {
+            padding: 8px 16px;
+            border: 2px solid #e67e22;
+            border-radius: 20px;
+            background: white;
+            color: #e67e22;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .durum-filtre-btn:hover {
+            background: #fef5ec;
+        }
+
+        .durum-filtre-btn.active {
+            background: #e67e22;
+            color: white;
+        }
+
         .entegra-btn {
             background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
             color: white;
@@ -614,6 +642,12 @@
         <div class="upload-area">
             <h2>Entegra'dan Otomatik Çek</h2>
             <p style="color: #666; margin-bottom: 15px;">Entegra panelinden siparişleri otomatik indir</p>
+
+            <div class="durum-filtre-group">
+                <button class="durum-filtre-btn active" data-filtre="kargoya_verilecek" onclick="durumFiltreSecim(this)">Kargoya Verilecek</button>
+                <button class="durum-filtre-btn" data-filtre="yeni_siparis" onclick="durumFiltreSecim(this)">Yeni Sipariş</button>
+                <button class="durum-filtre-btn" data-filtre="hepsi" onclick="durumFiltreSecim(this)">Her İkisi</button>
+            </div>
 
             <div style="margin-top: 15px;">
                 <button class="entegra-btn" id="entegraBtn" onclick="entegraCek()">🌐 Entegra'dan Çek</button>
@@ -774,6 +808,13 @@
 
         // ==================== ENTEGRA OTOMATİK ÇEK ====================
         let entegraDurumInterval = null;
+        let entegraFiltre = 'kargoya_verilecek';
+
+        function durumFiltreSecim(btn) {
+            document.querySelectorAll('.durum-filtre-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            entegraFiltre = btn.dataset.filtre;
+        }
 
         async function entegraCek() {
             const btn = document.getElementById('entegraBtn');
@@ -879,7 +920,11 @@
             loading.classList.add('show');
 
             try {
-                const response = await fetch('/entegra-analiz', { method: 'POST' });
+                const response = await fetch('/entegra-analiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ durum_filtre: entegraFiltre })
+                });
                 const data = await response.json();
 
                 loading.classList.remove('show');

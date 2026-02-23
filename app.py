@@ -359,8 +359,12 @@ def entegra_durum_route():
     return jsonify(sonuc)
 
 
-def entegra_analiz_yap(df):
+def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
     """Entegra Excel formatını analiz eder - sütun isimlerine göre dinamik tespit yapar
+
+    Args:
+        df: Excel DataFrame
+        durum_filtre: 'kargoya_verilecek', 'yeni_siparis' veya 'hepsi'
 
     Desteklenen formatlar:
     - Ayrıntılı Excel (Türkçe başlıklar): Platform Referans No, Entegrasyon, Pazaryeri Durumu, Ürün İsmi, Adet
@@ -428,9 +432,16 @@ def entegra_analiz_yap(df):
         if 'trendyol' not in platform:
             continue
 
-        # Sadece "Kargoya verilecek" durumundakiler
-        if 'kargoya verilecek' not in durum and 'Kargoya Verilecek' not in str(durum_sutunu.iloc[i]):
-            continue
+        # Pazaryeri durumu filtresi
+        if durum_filtre == 'kargoya_verilecek':
+            if 'kargoya verilecek' not in durum:
+                continue
+        elif durum_filtre == 'yeni_siparis':
+            if 'yeni' not in durum:
+                continue
+        elif durum_filtre == 'hepsi':
+            if 'kargoya verilecek' not in durum and 'yeni' not in durum:
+                continue
 
         try:
             adet = int(float(adet_sutunu.iloc[i]))
@@ -532,9 +543,13 @@ def entegra_analiz():
     if not os.path.exists(dosya_yolu):
         return jsonify({'error': 'Dosya bulunamadı!'})
 
+    durum_filtre = 'kargoya_verilecek'
+    if request.is_json and request.json:
+        durum_filtre = request.json.get('durum_filtre', 'kargoya_verilecek')
+
     try:
         df = pd.read_excel(dosya_yolu, header=None)
-        sonuc, hata = entegra_analiz_yap(df)
+        sonuc, hata = entegra_analiz_yap(df, durum_filtre)
 
         if hata:
             return jsonify({'error': hata})
