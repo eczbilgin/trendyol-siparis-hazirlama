@@ -24,6 +24,19 @@ def sutun_indeksi(sutun_adi):
         indeks += (ord(harf) - ord('A') + 1) * (26 ** i)
     return indeks - 1
 
+
+def basliga_gore_sutun_bul(df, aranan_basliklar):
+    """İlk satırdaki başlıklara göre sütun indeksini bulur.
+    aranan_basliklar: aranacak başlık isimlerinin listesi (ilk eşleşen döner)
+    Bulunamazsa None döner.
+    """
+    for col_idx in range(df.shape[1]):
+        baslik = str(df.iloc[0, col_idx]).strip()
+        for aranan in aranan_basliklar:
+            if baslik == aranan:
+                return col_idx
+    return None
+
 def analiz_yap(df):
     """Excel verisini analiz eder"""
     bn_idx = sutun_indeksi('BN')  # Ürün adı
@@ -347,43 +360,47 @@ def entegra_durum_route():
 
 
 def entegra_analiz_yap(df):
-    """Entegra Excel formatını analiz eder - iki formatı destekler
+    """Entegra Excel formatını analiz eder - sütun isimlerine göre dinamik tespit yapar
 
-    Format 1 - Ayrıntılı Excel (Türkçe başlıklar, 85 sütun):
-    - 3: Platform Referans No (sipariş no)
-    - 8: Entegrasyon (platform)
-    - 18: Pazaryeri Durumu
-    - 50: Ürün İsmi
-    - 55: Adet
-
-    Format 2 - Normal Excel (İngilizce başlıklar, 172 sütun):
-    - 33: order_number
-    - 3: entegration
-    - 47: store_order_status_name
-    - 166: product_name
-    - 112: total_product_quantity
+    Desteklenen formatlar:
+    - Ayrıntılı Excel (Türkçe başlıklar): Platform Referans No, Entegrasyon, Pazaryeri Durumu, Ürün İsmi, Adet
+    - Normal Excel (İngilizce başlıklar): order_number, entegration, store_order_status_name, product_name, total_product_quantity
     """
     # İlk satıra bakarak formatı algıla
     ilk_hucre = str(df.iloc[0, 0]).strip()
 
     if ilk_hucre == 'ID' or 'Tarih' in str(df.iloc[0, 1]):
-        # Format 1 - Ayrıntılı Excel (Türkçe)
-        siparis_idx = 3    # Platform Referans No
-        platform_idx = 8   # Entegrasyon
-        durum_idx = 18     # Pazaryeri Durumu
-        urun_idx = 50      # Ürün İsmi
-        adet_idx = 55      # Adet
-    else:
-        # Format 2 - Normal Excel (İngilizce)
-        siparis_idx = 33   # order_number
-        platform_idx = 3   # entegration
-        durum_idx = 47     # store_order_status_name
-        urun_idx = 166     # product_name
-        adet_idx = 112     # total_product_quantity
+        # Format 1 - Ayrıntılı Excel (Türkçe) - başlık ismine göre bul
+        siparis_idx = basliga_gore_sutun_bul(df, ['Platform Referans No'])
+        platform_idx = basliga_gore_sutun_bul(df, ['Entegrasyon'])
+        durum_idx = basliga_gore_sutun_bul(df, ['Pazaryeri Durumu'])
+        urun_idx = basliga_gore_sutun_bul(df, ['Ürün İsmi', 'Ürün ismi'])
+        adet_idx = basliga_gore_sutun_bul(df, ['Adet'])
 
-    max_idx = max(siparis_idx, platform_idx, durum_idx, urun_idx, adet_idx)
-    if df.shape[1] <= max_idx:
-        return None, f"Excel dosyasında yeterli sütun yok! (Beklenen: {max_idx+1}, Mevcut: {df.shape[1]})"
+        eksik = []
+        if siparis_idx is None: eksik.append('Platform Referans No')
+        if platform_idx is None: eksik.append('Entegrasyon')
+        if durum_idx is None: eksik.append('Pazaryeri Durumu')
+        if urun_idx is None: eksik.append('Ürün İsmi')
+        if adet_idx is None: eksik.append('Adet')
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
+    else:
+        # Format 2 - Normal Excel (İngilizce) - başlık ismine göre bul
+        siparis_idx = basliga_gore_sutun_bul(df, ['order_number'])
+        platform_idx = basliga_gore_sutun_bul(df, ['entegration'])
+        durum_idx = basliga_gore_sutun_bul(df, ['store_order_status_name'])
+        urun_idx = basliga_gore_sutun_bul(df, ['product_name'])
+        adet_idx = basliga_gore_sutun_bul(df, ['total_product_quantity'])
+
+        eksik = []
+        if siparis_idx is None: eksik.append('order_number')
+        if platform_idx is None: eksik.append('entegration')
+        if durum_idx is None: eksik.append('store_order_status_name')
+        if urun_idx is None: eksik.append('product_name')
+        if adet_idx is None: eksik.append('total_product_quantity')
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
 
     urun_sutunu = df.iloc[:, urun_idx]
     adet_sutunu = df.iloc[:, adet_idx]
@@ -586,45 +603,47 @@ def genel_entegra_durum_route():
 
 
 def genel_entegra_analiz_yap(df):
-    """Genel siparişler için Entegra Excel analizi
+    """Genel siparişler için Entegra Excel analizi - sütun isimlerine göre dinamik tespit yapar
 
-    İki farklı Excel formatını destekler:
-
-    Format 1 - Ayrıntılı Excel (Türkçe başlıklar, 85 sütun):
-    - 3: Platform Referans No (ARAMA ANAHTARI)
-    - 33: Kargo Kodu
-    - 50: Ürün İsmi
-    - 55: Adet
-    - 60: Barkod
-
-    Format 2 - Normal Excel (İngilizce başlıklar, 172 sütun):
-    - 33: order_number (ARAMA ANAHTARI)
-    - 40: cargo_code
-    - 166: product_name
-    - 170: barcode
-    - 112: total_product_quantity
+    Desteklenen formatlar:
+    - Ayrıntılı Excel (Türkçe): Platform Referans No, Kargo Kodu, Ürün İsmi, Adet, Barkod
+    - Normal Excel (İngilizce): order_number, cargo_code, product_name, total_product_quantity, barcode
     """
     # İlk satıra bakarak formatı algıla
     ilk_hucre = str(df.iloc[0, 0]).strip()
 
     if ilk_hucre == 'ID' or 'Tarih' in str(df.iloc[0, 1]):
-        # Format 1 - Ayrıntılı Excel (Türkçe)
-        siparis_idx = 3    # Platform Referans No
-        kargo_idx = 33     # Kargo Kodu
-        urun_idx = 50      # Ürün İsmi
-        adet_idx = 55      # Adet
-        barkod_idx = 60    # Barkod
-    else:
-        # Format 2 - Normal Excel (İngilizce)
-        siparis_idx = 33   # order_number
-        kargo_idx = 40     # cargo_code
-        urun_idx = 166     # product_name
-        adet_idx = 112     # total_product_quantity
-        barkod_idx = 170   # barcode
+        # Format 1 - Ayrıntılı Excel (Türkçe) - başlık ismine göre bul
+        siparis_idx = basliga_gore_sutun_bul(df, ['Platform Referans No'])
+        kargo_idx = basliga_gore_sutun_bul(df, ['Kargo Kodu'])
+        urun_idx = basliga_gore_sutun_bul(df, ['Ürün İsmi', 'Ürün ismi'])
+        adet_idx = basliga_gore_sutun_bul(df, ['Adet'])
+        barkod_idx = basliga_gore_sutun_bul(df, ['Barkod'])
 
-    max_idx = max(siparis_idx, kargo_idx, urun_idx, adet_idx, barkod_idx)
-    if df.shape[1] <= max_idx:
-        return None, f"Excel dosyasında yeterli sütun yok! (Beklenen: {max_idx+1}, Mevcut: {df.shape[1]})"
+        eksik = []
+        if siparis_idx is None: eksik.append('Platform Referans No')
+        if kargo_idx is None: eksik.append('Kargo Kodu')
+        if urun_idx is None: eksik.append('Ürün İsmi')
+        if adet_idx is None: eksik.append('Adet')
+        if barkod_idx is None: eksik.append('Barkod')
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
+    else:
+        # Format 2 - Normal Excel (İngilizce) - başlık ismine göre bul
+        siparis_idx = basliga_gore_sutun_bul(df, ['order_number'])
+        kargo_idx = basliga_gore_sutun_bul(df, ['cargo_code'])
+        urun_idx = basliga_gore_sutun_bul(df, ['product_name'])
+        adet_idx = basliga_gore_sutun_bul(df, ['total_product_quantity'])
+        barkod_idx = basliga_gore_sutun_bul(df, ['barcode'])
+
+        eksik = []
+        if siparis_idx is None: eksik.append('order_number')
+        if kargo_idx is None: eksik.append('cargo_code')
+        if urun_idx is None: eksik.append('product_name')
+        if adet_idx is None: eksik.append('total_product_quantity')
+        if barkod_idx is None: eksik.append('barcode')
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
 
     siparis_sutunu = df.iloc[:, siparis_idx]
     kargo_sutunu = df.iloc[:, kargo_idx]
@@ -632,7 +651,7 @@ def genel_entegra_analiz_yap(df):
     adet_sutunu = df.iloc[:, adet_idx]
     barkod_sutunu = df.iloc[:, barkod_idx]
 
-    # Sipariş No -> ürün bilgisi eşleştirmesi
+    # Kargo Kodu -> ürün bilgisi eşleştirmesi (barkod okuyucu ile kargo kodu okutulur)
     barkodlar = {}
 
     for i in range(len(df)):
@@ -641,11 +660,14 @@ def genel_entegra_analiz_yap(df):
         kargo_kodu = str(kargo_sutunu.iloc[i]).strip()
         barkod = str(barkod_sutunu.iloc[i]).strip()
 
-        if siparis_no == '' or siparis_no == 'nan' or pd.isna(siparis_sutunu.iloc[i]):
+        if kargo_kodu == '' or kargo_kodu == 'nan' or pd.isna(kargo_sutunu.iloc[i]):
             continue
 
         # Başlık satırını atla
-        if siparis_no in ['order_number', 'Platform Referans No'] or 'Sipari' in siparis_no:
+        if kargo_kodu in ['cargo_code', 'Kargo Kodu']:
+            continue
+
+        if not urun or urun == 'nan' or pd.isna(urun_sutunu.iloc[i]):
             continue
 
         # Adet bilgisini al
@@ -654,14 +676,14 @@ def genel_entegra_analiz_yap(df):
         except (ValueError, TypeError):
             adet = 1
 
-        if siparis_no not in barkodlar:
-            barkodlar[siparis_no] = []
+        if kargo_kodu not in barkodlar:
+            barkodlar[kargo_kodu] = []
 
-        barkodlar[siparis_no].append({
+        barkodlar[kargo_kodu].append({
             'urun': urun,
             'adet': adet,
             'barkod': barkod,
-            'kargo_kodu': kargo_kodu
+            'siparis_no': siparis_no
         })
 
     return {'barkodlar': barkodlar}, None
