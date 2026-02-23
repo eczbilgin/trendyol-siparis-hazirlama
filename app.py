@@ -14,6 +14,8 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 # Entegra çekme durumu (thread-safe)
 entegra_durum = {'durum': 'bosta', 'mesaj': '', 'dosya': None, 'detay': None}
+# Genel siparişler için ayrı durum
+genel_entegra_durum = {'durum': 'bosta', 'mesaj': '', 'dosya': None, 'detay': None}
 
 def sutun_indeksi(sutun_adi):
     """Excel sütun adını indekse çevirir"""
@@ -345,23 +347,49 @@ def entegra_durum_route():
 
 
 def entegra_analiz_yap(df):
-    """Entegra Excel formatını analiz eder (sütun harfleriyle)"""
-    # Entegra "Ayrıntılı Excel" sütun pozisyonları
-    fk_idx = sutun_indeksi('FK')  # Ürün ismi (product_name)
-    di_idx = sutun_indeksi('DI')  # Sipariş adedi (total_product_quantity)
-    ah_idx = sutun_indeksi('AH')  # Sipariş numarası (order_number)
-    d_idx = sutun_indeksi('D')    # Platform (entegration)
-    av_idx2 = sutun_indeksi('AV') # Pazaryeri durumu (store_order_status_name)
-    fo_idx = sutun_indeksi('FO')  # Barkod (barcode)
+    """Entegra Excel formatını analiz eder - iki formatı destekler
 
-    if df.shape[1] <= max(fk_idx, di_idx, ah_idx, d_idx, av_idx2, fo_idx):
-        return None, "Excel dosyasında yeterli sütun yok!"
+    Format 1 - Ayrıntılı Excel (Türkçe başlıklar, 85 sütun):
+    - 3: Platform Referans No (sipariş no)
+    - 8: Entegrasyon (platform)
+    - 18: Pazaryeri Durumu
+    - 50: Ürün İsmi
+    - 55: Adet
 
-    urun_sutunu = df.iloc[:, fk_idx]
-    adet_sutunu = df.iloc[:, di_idx]
-    siparis_sutunu = df.iloc[:, ah_idx]
-    platform_sutunu = df.iloc[:, d_idx]
-    durum_sutunu = df.iloc[:, av_idx2]
+    Format 2 - Normal Excel (İngilizce başlıklar, 172 sütun):
+    - 33: order_number
+    - 3: entegration
+    - 47: store_order_status_name
+    - 166: product_name
+    - 112: total_product_quantity
+    """
+    # İlk satıra bakarak formatı algıla
+    ilk_hucre = str(df.iloc[0, 0]).strip()
+
+    if ilk_hucre == 'ID' or 'Tarih' in str(df.iloc[0, 1]):
+        # Format 1 - Ayrıntılı Excel (Türkçe)
+        siparis_idx = 3    # Platform Referans No
+        platform_idx = 8   # Entegrasyon
+        durum_idx = 18     # Pazaryeri Durumu
+        urun_idx = 50      # Ürün İsmi
+        adet_idx = 55      # Adet
+    else:
+        # Format 2 - Normal Excel (İngilizce)
+        siparis_idx = 33   # order_number
+        platform_idx = 3   # entegration
+        durum_idx = 47     # store_order_status_name
+        urun_idx = 166     # product_name
+        adet_idx = 112     # total_product_quantity
+
+    max_idx = max(siparis_idx, platform_idx, durum_idx, urun_idx, adet_idx)
+    if df.shape[1] <= max_idx:
+        return None, f"Excel dosyasında yeterli sütun yok! (Beklenen: {max_idx+1}, Mevcut: {df.shape[1]})"
+
+    urun_sutunu = df.iloc[:, urun_idx]
+    adet_sutunu = df.iloc[:, adet_idx]
+    siparis_sutunu = df.iloc[:, siparis_idx]
+    platform_sutunu = df.iloc[:, platform_idx]
+    durum_sutunu = df.iloc[:, durum_idx]
 
     urun_ozeti = {}
     siparis_detay = {}
@@ -376,7 +404,7 @@ def entegra_analiz_yap(df):
             continue
 
         # Başlık satırını atla
-        if urun == 'Ürün İsmi' or 'product' in urun.lower():
+        if urun == 'Ürün İsmi' or 'product' in urun.lower() or urun == 'Ürün ismi':
             continue
 
         # Sadece Trendyol siparişleri
@@ -384,7 +412,7 @@ def entegra_analiz_yap(df):
             continue
 
         # Sadece "Kargoya verilecek" durumundakiler
-        if 'kargoya verilecek' not in durum:
+        if 'kargoya verilecek' not in durum and 'Kargoya Verilecek' not in str(durum_sutunu.iloc[i]):
             continue
 
         try:
@@ -490,6 +518,168 @@ def entegra_analiz():
     try:
         df = pd.read_excel(dosya_yolu, header=None)
         sonuc, hata = entegra_analiz_yap(df)
+
+        if hata:
+            return jsonify({'error': hata})
+
+        return jsonify(sonuc)
+    except Exception as e:
+        return jsonify({'error': f'Hata: {str(e)}'})
+
+
+@app.route('/genel-entegra-cek', methods=['POST'])
+def genel_entegra_cek_route():
+    """Genel siparişler için Entegra'dan Selenium ile Excel çeker (filtresiz)"""
+    global genel_entegra_durum
+
+    if genel_entegra_durum['durum'] == 'calisiyor':
+        return jsonify({'error': 'Zaten bir indirme işlemi devam ediyor!'})
+
+    email = os.getenv('ENTEGRA_EMAIL', '')
+    sifre = os.getenv('ENTEGRA_SIFRE', '')
+
+    if not email or not sifre:
+        return jsonify({'error': 'E-posta ve şifre .env dosyasında tanımlı değil!'})
+
+    genel_entegra_durum = {'durum': 'calisiyor', 'mesaj': 'Entegra paneline bağlanılıyor...', 'dosya': None, 'detay': None}
+
+    def cek_thread():
+        global genel_entegra_durum
+        try:
+            # Tarih filtresi ile çek (ama trendyol/kargoya verilecek filtresi yok)
+            sonuc = excel_cek(email, sifre, headless=False, tarih_filtresi=True)
+            if sonuc['basarili']:
+                genel_entegra_durum = {
+                    'durum': 'tamamlandi',
+                    'mesaj': sonuc['mesaj'],
+                    'dosya': sonuc['dosya'],
+                    'detay': None
+                }
+            else:
+                genel_entegra_durum = {
+                    'durum': 'hata',
+                    'mesaj': sonuc['mesaj'],
+                    'dosya': None,
+                    'detay': sonuc.get('sayfa_bilgisi')
+                }
+        except Exception as e:
+            genel_entegra_durum = {
+                'durum': 'hata',
+                'mesaj': f'Beklenmeyen hata: {str(e)}',
+                'dosya': None,
+                'detay': None
+            }
+
+    thread = threading.Thread(target=cek_thread)
+    thread.start()
+
+    return jsonify({'mesaj': 'İndirme başlatıldı, tarayıcı açılacak...'})
+
+
+@app.route('/genel-entegra-durum')
+def genel_entegra_durum_route():
+    """Genel siparişler için Entegra indirme durumunu döndürür"""
+    sonuc = dict(genel_entegra_durum)
+    if sonuc['durum'] == 'calisiyor' and entegra_cek.durum_mesaj:
+        sonuc['mesaj'] = entegra_cek.durum_mesaj
+    return jsonify(sonuc)
+
+
+def genel_entegra_analiz_yap(df):
+    """Genel siparişler için Entegra Excel analizi
+
+    İki farklı Excel formatını destekler:
+
+    Format 1 - Ayrıntılı Excel (Türkçe başlıklar, 85 sütun):
+    - 3: Platform Referans No (ARAMA ANAHTARI)
+    - 33: Kargo Kodu
+    - 50: Ürün İsmi
+    - 55: Adet
+    - 60: Barkod
+
+    Format 2 - Normal Excel (İngilizce başlıklar, 172 sütun):
+    - 33: order_number (ARAMA ANAHTARI)
+    - 40: cargo_code
+    - 166: product_name
+    - 170: barcode
+    - 112: total_product_quantity
+    """
+    # İlk satıra bakarak formatı algıla
+    ilk_hucre = str(df.iloc[0, 0]).strip()
+
+    if ilk_hucre == 'ID' or 'Tarih' in str(df.iloc[0, 1]):
+        # Format 1 - Ayrıntılı Excel (Türkçe)
+        siparis_idx = 3    # Platform Referans No
+        kargo_idx = 33     # Kargo Kodu
+        urun_idx = 50      # Ürün İsmi
+        adet_idx = 55      # Adet
+        barkod_idx = 60    # Barkod
+    else:
+        # Format 2 - Normal Excel (İngilizce)
+        siparis_idx = 33   # order_number
+        kargo_idx = 40     # cargo_code
+        urun_idx = 166     # product_name
+        adet_idx = 112     # total_product_quantity
+        barkod_idx = 170   # barcode
+
+    max_idx = max(siparis_idx, kargo_idx, urun_idx, adet_idx, barkod_idx)
+    if df.shape[1] <= max_idx:
+        return None, f"Excel dosyasında yeterli sütun yok! (Beklenen: {max_idx+1}, Mevcut: {df.shape[1]})"
+
+    siparis_sutunu = df.iloc[:, siparis_idx]
+    kargo_sutunu = df.iloc[:, kargo_idx]
+    urun_sutunu = df.iloc[:, urun_idx]
+    adet_sutunu = df.iloc[:, adet_idx]
+    barkod_sutunu = df.iloc[:, barkod_idx]
+
+    # Sipariş No -> ürün bilgisi eşleştirmesi
+    barkodlar = {}
+
+    for i in range(len(df)):
+        siparis_no = str(siparis_sutunu.iloc[i]).strip()
+        urun = str(urun_sutunu.iloc[i]).strip()
+        kargo_kodu = str(kargo_sutunu.iloc[i]).strip()
+        barkod = str(barkod_sutunu.iloc[i]).strip()
+
+        if siparis_no == '' or siparis_no == 'nan' or pd.isna(siparis_sutunu.iloc[i]):
+            continue
+
+        # Başlık satırını atla
+        if siparis_no in ['order_number', 'Platform Referans No'] or 'Sipari' in siparis_no:
+            continue
+
+        # Adet bilgisini al
+        try:
+            adet = int(float(adet_sutunu.iloc[i]))
+        except (ValueError, TypeError):
+            adet = 1
+
+        if siparis_no not in barkodlar:
+            barkodlar[siparis_no] = []
+
+        barkodlar[siparis_no].append({
+            'urun': urun,
+            'adet': adet,
+            'barkod': barkod,
+            'kargo_kodu': kargo_kodu
+        })
+
+    return {'barkodlar': barkodlar}, None
+
+
+@app.route('/genel-entegra-analiz', methods=['POST'])
+def genel_entegra_analiz():
+    """İndirilen Entegra Excel dosyasını genel siparişler için analiz eder"""
+    if not genel_entegra_durum.get('dosya'):
+        return jsonify({'error': 'Henüz indirilmiş dosya yok!'})
+
+    dosya_yolu = genel_entegra_durum['dosya']
+    if not os.path.exists(dosya_yolu):
+        return jsonify({'error': 'Dosya bulunamadı!'})
+
+    try:
+        df = pd.read_excel(dosya_yolu, header=None)
+        sonuc, hata = genel_entegra_analiz_yap(df)
 
         if hata:
             return jsonify({'error': hata})

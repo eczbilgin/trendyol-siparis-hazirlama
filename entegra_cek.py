@@ -295,29 +295,53 @@ def excel_indir(driver):
     if not toplu_islem_bulundu:
         return False, "'Toplu İşlemler' butonu bulunamadı."
 
-    # "Ayrıntılı Excel" butonuna tıkla
+    # "Ayrıntılı Excel" butonuna tıkla (sadece "Excel" değil, "Ayrıntılı Excel" olmalı!)
     durum_guncelle('Ayrintili Excel butonuna tiklaniyor...')
     excel_bulundu = False
-    excel_selectors = [
-        "//button[contains(text(), 'Excel')]",
-        "//a[contains(text(), 'Excel')]",
-        "//*[contains(text(), 'Ayr') and contains(text(), 'Excel')]",
-        "//button[contains(text(), 'Ayr')]",
-        "//a[contains(text(), 'Ayr')]",
+
+    # Önce "Ayrıntılı Excel" butonunu ara
+    ayrintili_selectors = [
+        "//button[contains(text(), 'Ayrıntılı') and contains(text(), 'Excel')]",
+        "//a[contains(text(), 'Ayrıntılı') and contains(text(), 'Excel')]",
+        "//*[contains(text(), 'Ayrıntılı Excel')]",
+        "//button[contains(text(), 'Ayrintili') and contains(text(), 'Excel')]",
+        "//a[contains(text(), 'Ayrintili') and contains(text(), 'Excel')]",
     ]
-    for selector in excel_selectors:
+
+    for selector in ayrintili_selectors:
         try:
             elements = driver.find_elements(By.XPATH, selector)
             for el in elements:
-                if el.is_displayed() and 'Excel' in el.text:
+                if el.is_displayed():
                     el.click()
                     excel_bulundu = True
+                    durum_guncelle('Ayrintili Excel butonuna tiklandi!')
                     time.sleep(3)
                     break
             if excel_bulundu:
                 break
         except:
             continue
+
+    # Bulunamadıysa, text içeriğine göre ara
+    if not excel_bulundu:
+        try:
+            # Tüm buton ve linkleri tara
+            all_elements = driver.find_elements(By.XPATH, "//button | //a")
+            for el in all_elements:
+                try:
+                    text = el.text.strip()
+                    if 'Ayrıntılı Excel' in text or 'Ayrintili Excel' in text:
+                        if el.is_displayed():
+                            el.click()
+                            excel_bulundu = True
+                            durum_guncelle('Ayrintili Excel butonuna tiklandi!')
+                            time.sleep(3)
+                            break
+                except:
+                    continue
+        except:
+            pass
 
     if not excel_bulundu:
         return False, "'Ayrıntılı Excel' butonu bulunamadı."
@@ -387,8 +411,15 @@ def sayfa_bilgisi_al(driver):
     return bilgi
 
 
-def excel_cek(email, sifre, headless=False):
-    """Ana fonksiyon: Entegra'ya giriş yap → Siparişler → Toplu İşlemler → Ayrıntılı Excel"""
+def excel_cek(email, sifre, headless=False, tarih_filtresi=True):
+    """Ana fonksiyon: Entegra'ya giriş yap → Siparişler → Toplu İşlemler → Ayrıntılı Excel
+
+    Args:
+        email: Entegra email
+        sifre: Entegra şifre
+        headless: Tarayıcı görünmez modda mı çalışsın
+        tarih_filtresi: True ise 1 haftalık tarih filtresi uygular
+    """
     driver = None
     try:
         durum_guncelle('Chrome tarayici baslatiliyor...')
@@ -406,11 +437,12 @@ def excel_cek(email, sifre, headless=False):
             sayfa = sayfa_bilgisi_al(driver)
             return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'siparisler'}
 
-        # Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık
-        basarili, mesaj = tarih_filtrele(driver)
-        if not basarili:
-            sayfa = sayfa_bilgisi_al(driver)
-            return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'tarih_filtrele'}
+        # Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık (opsiyonel)
+        if tarih_filtresi:
+            basarili, mesaj = tarih_filtrele(driver)
+            if not basarili:
+                sayfa = sayfa_bilgisi_al(driver)
+                return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'tarih_filtrele'}
 
         # Adım 4-5: Toplu İşlemler → Ayrıntılı Excel → İndir
         basarili, sonuc = excel_indir(driver)

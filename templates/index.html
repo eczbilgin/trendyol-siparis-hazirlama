@@ -694,8 +694,21 @@
         <!-- Genel Sipariş Sekmesi -->
         <div id="genel-tab" class="tab-content">
             <div class="upload-area">
+                <h2>Entegra'dan Otomatik Çek</h2>
+                <p style="color: #666; margin-bottom: 15px;">Entegra panelinden siparişleri otomatik indir</p>
+
+                <div style="margin-top: 15px;">
+                    <button class="entegra-btn" id="genelEntegraBtn" onclick="genelEntegraCek()">🌐 Entegra'dan Çek</button>
+                </div>
+
+                <div class="entegra-status" id="genelEntegraStatus">
+                    <div id="genelEntegraStatusText"></div>
+                </div>
+
+                <div class="veya-ayirici"><span>VEYA</span></div>
+
                 <h2>Genel Sipariş Hazırlama</h2>
-                <p style="color: #666; margin-bottom: 20px;">Önce Excel dosyasını yükleyin, sonra barkod okutun</p>
+                <p style="color: #666; margin-bottom: 20px;">Excel dosyasını yükleyin, sonra barkod okutun</p>
 
                 <div class="file-input-wrapper">
                     <input type="file" id="genelFileInput" class="file-input" accept=".xlsx">
@@ -1052,6 +1065,107 @@
             }
 
             results.classList.add('show');
+        }
+
+        // ==================== GENEL SİPARİŞLER - ENTEGRA ÇEK ====================
+        let genelEntegraDurumInterval = null;
+
+        async function genelEntegraCek() {
+            const btn = document.getElementById('genelEntegraBtn');
+            const status = document.getElementById('genelEntegraStatus');
+            const statusText = document.getElementById('genelEntegraStatusText');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Bağlanıyor...';
+            status.className = 'entegra-status calisiyor';
+            status.style.display = 'block';
+            statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;"></div> Entegra paneline bağlanılıyor, tarayıcı açılacak...';
+
+            try {
+                const response = await fetch('/genel-entegra-cek', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    status.className = 'entegra-status hata';
+                    statusText.textContent = data.error;
+                    btn.disabled = false;
+                    btn.textContent = '🌐 Entegra\'dan Çek';
+                    return;
+                }
+
+                // Durum kontrolü başlat
+                genelEntegraDurumKontrol();
+
+            } catch (error) {
+                status.className = 'entegra-status hata';
+                statusText.textContent = 'Bağlantı hatası: ' + error.message;
+                btn.disabled = false;
+                btn.textContent = '🌐 Entegra\'dan Çek';
+            }
+        }
+
+        function genelEntegraDurumKontrol() {
+            if (genelEntegraDurumInterval) clearInterval(genelEntegraDurumInterval);
+
+            genelEntegraDurumInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/genel-entegra-durum');
+                    const data = await response.json();
+
+                    const status = document.getElementById('genelEntegraStatus');
+                    const statusText = document.getElementById('genelEntegraStatusText');
+                    const btn = document.getElementById('genelEntegraBtn');
+
+                    if (data.durum === 'calisiyor') {
+                        status.className = 'entegra-status calisiyor';
+                        statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;"></div> ' + data.mesaj;
+                    } else if (data.durum === 'tamamlandi') {
+                        clearInterval(genelEntegraDurumInterval);
+                        status.className = 'entegra-status tamamlandi';
+                        statusText.textContent = '✅ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🌐 Entegra\'dan Çek';
+
+                        // Otomatik analiz yap
+                        genelEntegraAnaliz();
+                    } else if (data.durum === 'hata') {
+                        clearInterval(genelEntegraDurumInterval);
+                        status.className = 'entegra-status hata';
+                        statusText.textContent = '❌ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🌐 Entegra\'dan Çek';
+                    }
+                } catch (error) {
+                    // Sessizce devam et
+                }
+            }, 2000);
+        }
+
+        async function genelEntegraAnaliz() {
+            try {
+                const response = await fetch('/genel-entegra-analiz', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Analiz hatası: ' + data.error);
+                    return;
+                }
+
+                // Excel verilerini sakla ve barkod alanını göster
+                excelData = data.barkodlar;
+                barcodeArea.style.display = 'block';
+                barcodeInput.focus();
+
+                alert(`Excel yüklendi! ${Object.keys(excelData).length} farklı barkod bulundu.`);
+
+            } catch (error) {
+                alert('Analiz hatası: ' + error.message);
+            }
         }
 
         // ==================== GENEL SİPARİŞLER ====================
