@@ -625,6 +625,131 @@
             padding: 0 15px;
             font-weight: bold;
         }
+
+        /* Kargo Etiketi Butonları */
+        .etiket-btn {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: 10px;
+        }
+
+        .etiket-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 3px 15px rgba(0, 206, 201, 0.4);
+        }
+
+        .etiket-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .etiket-btn-tumu {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.3s;
+        }
+
+        .etiket-btn-tumu:hover {
+            transform: scale(1.05);
+        }
+
+        .etiket-btn-tumu:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Etiket modal/popup */
+        .etiket-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .etiket-overlay.show {
+            display: flex;
+        }
+
+        .etiket-modal {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .etiket-modal h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #00b894;
+            padding-bottom: 10px;
+        }
+
+        .etiket-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .etiket-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #00b894;
+        }
+
+        .etiket-item a {
+            color: #00b894;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .etiket-item a:hover {
+            text-decoration: underline;
+        }
+
+        .etiket-hata {
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
@@ -698,6 +823,7 @@
                 </div>
                 <div style="text-align: center; margin-top: 20px;">
                     <button class="print-btn" onclick="window.print()">🖨️ Yazdır</button>
+                    <button class="etiket-btn-tumu" id="tumEtiketlerBtn" onclick="tumEtiketleriYazdir()">🏷️ Tüm Kargo Etiketleri</button>
                 </div>
             </div>
 
@@ -788,6 +914,20 @@
                 <tbody id="genelPrintTableBody"></tbody>
             </table>
         </div><!-- Genel sipariş sekmesi sonu -->
+    </div>
+
+    <!-- Kargo Etiketi Modal -->
+    <div class="etiket-overlay" id="etiketOverlay" onclick="if(event.target===this)etiketModalKapat()">
+        <div class="etiket-modal">
+            <button class="etiket-modal-close" onclick="etiketModalKapat()">&times;</button>
+            <h3 id="etiketModalBaslik">🏷️ Kargo Etiketleri</h3>
+            <div id="etiketModalIcerik">
+                <div style="text-align:center;">
+                    <div class="spinner"></div>
+                    <p style="margin-top:15px;color:#666;">Etiketler yükleniyor...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -996,8 +1136,13 @@
             }
         });
 
+        // Analiz verisini global sakla (etiket yazdırma için)
+        let sonAnalizVerisi = null;
+
         // ==================== ANALİZ SONUÇLARINI GÖSTER ====================
         function showAnalysisResults(data) {
+            sonAnalizVerisi = data;
+
             // Özet bilgileri güncelle
             document.getElementById('urunCesidi').textContent = data.ozet.urun_cesidi;
             document.getElementById('toplamSiparis').textContent = data.ozet.toplam_siparis;
@@ -1015,7 +1160,7 @@
             printHeader.innerHTML = `SİPARİŞ HAZIRLAMA LİSTESİ - ${tarih}<br>Toplam: ${data.ozet.urun_cesidi} ürün, ${data.ozet.toplam_urun} adet`;
 
             let siraNo = 1;
-            data.urunler.forEach(urun => {
+            data.urunler.forEach((urun, index) => {
                 const card = document.createElement('div');
                 card.className = 'product-card';
 
@@ -1027,6 +1172,12 @@
                 });
                 paketlerText += '</table>';
 
+                // Etiket butonu - sipariş numaraları varsa göster
+                const siparisNolari = urun.siparis_numaralari || [];
+                const etiketBtnHTML = siparisNolari.length > 0
+                    ? `<button class="etiket-btn" onclick="urunEtiketYazdir(${index})">🏷️ Etiket Yazdır (${siparisNolari.length})</button>`
+                    : '';
+
                 card.innerHTML = `
                     <div class="product-name">📦 ${urun.urun}</div>
                     <div class="product-info">
@@ -1037,6 +1188,7 @@
                         <div class="packages-title">🏷️ Paket Hazırlama:</div>
                         ${paketlerHTML}
                     </div>
+                    ${etiketBtnHTML}
                 `;
                 productList.appendChild(card);
 
@@ -1428,6 +1580,133 @@
             document.getElementById('printHeader').style.display = '';
             document.getElementById('genelPrintTable').style.display = 'none';
             document.getElementById('genelPrintHeader').style.display = 'none';
+        }
+
+        // ==================== KARGO ETİKET YAZDIRMA ====================
+
+        function etiketModalAc(baslik) {
+            const overlay = document.getElementById('etiketOverlay');
+            const modalBaslik = document.getElementById('etiketModalBaslik');
+            const modalIcerik = document.getElementById('etiketModalIcerik');
+
+            modalBaslik.textContent = baslik || '🏷️ Kargo Etiketleri';
+            modalIcerik.innerHTML = `
+                <div style="text-align:center;">
+                    <div class="spinner"></div>
+                    <p style="margin-top:15px;color:#666;">Trendyol API'den etiketler yükleniyor...</p>
+                </div>
+            `;
+            overlay.classList.add('show');
+        }
+
+        function etiketModalKapat() {
+            document.getElementById('etiketOverlay').classList.remove('show');
+        }
+
+        async function kargoEtiketGetir(siparisNumaralari, baslik) {
+            etiketModalAc(baslik);
+
+            try {
+                const response = await fetch('/kargo-etiket', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ siparis_numaralari: siparisNumaralari })
+                });
+
+                const data = await response.json();
+                const modalIcerik = document.getElementById('etiketModalIcerik');
+
+                if (data.error) {
+                    modalIcerik.innerHTML = `<div class="etiket-hata">${data.error}</div>`;
+                    return;
+                }
+
+                let html = '';
+
+                // Özet bilgi
+                html += `<div style="background:#d4edda;color:#155724;padding:12px;border-radius:8px;margin-bottom:15px;">
+                    <strong>${data.toplam_etiket}</strong> etiket bulundu
+                    ${data.toplam_hata > 0 ? ` | <strong style="color:#856404;">${data.toplam_hata}</strong> hata` : ''}
+                </div>`;
+
+                // Etiketler
+                if (data.etiketler && data.etiketler.length > 0) {
+                    // Tümünü Aç butonu
+                    html += `<div style="text-align:center;margin-bottom:15px;">
+                        <button class="etiket-btn-tumu" onclick="tumEtiketleriAc()">🖨️ Tüm Etiketleri Yeni Sekmede Aç</button>
+                    </div>`;
+
+                    html += '<div id="etiketListesi">';
+                    data.etiketler.forEach((etiket, i) => {
+                        html += `<div class="etiket-item">
+                            <div>
+                                <div style="font-weight:bold;color:#2c3e50;">Sipariş: ${etiket.siparis_no}</div>
+                                <div style="font-size:0.85em;color:#666;">${etiket.kargo_firmasi} - ${etiket.tracking_number}</div>
+                            </div>
+                            <a href="${etiket.etiket_url}" target="_blank" rel="noopener">Aç</a>
+                        </div>`;
+                    });
+                    html += '</div>';
+
+                    // Global'e etiket URL'lerini kaydet
+                    window._sonEtiketler = data.etiketler;
+                }
+
+                // Hatalar
+                if (data.hatalar && data.hatalar.length > 0) {
+                    html += '<div style="margin-top:15px;">';
+                    data.hatalar.forEach(hata => {
+                        html += `<div class="etiket-hata">${hata}</div>`;
+                    });
+                    html += '</div>';
+                }
+
+                modalIcerik.innerHTML = html;
+
+            } catch (error) {
+                document.getElementById('etiketModalIcerik').innerHTML =
+                    `<div class="etiket-hata">Bağlantı hatası: ${error.message}</div>`;
+            }
+        }
+
+        // Tek ürün için etiket yazdır
+        function urunEtiketYazdir(urunIndex) {
+            if (!sonAnalizVerisi || !sonAnalizVerisi.urunler[urunIndex]) return;
+
+            const urun = sonAnalizVerisi.urunler[urunIndex];
+            const siparisNolari = urun.siparis_numaralari || [];
+
+            if (siparisNolari.length === 0) {
+                alert('Bu ürün için sipariş numarası bulunamadı!');
+                return;
+            }
+
+            kargoEtiketGetir(siparisNolari, `🏷️ ${urun.urun} - Kargo Etiketleri`);
+        }
+
+        // Tüm siparişlerin etiketlerini yazdır
+        function tumEtiketleriYazdir() {
+            if (!sonAnalizVerisi || !sonAnalizVerisi.tum_siparis_numaralari) {
+                alert('Önce sipariş analizi yapmalısınız!');
+                return;
+            }
+
+            const tumNolar = sonAnalizVerisi.tum_siparis_numaralari;
+            if (tumNolar.length === 0) {
+                alert('Sipariş numarası bulunamadı!');
+                return;
+            }
+
+            kargoEtiketGetir(tumNolar, `🏷️ Tüm Kargo Etiketleri (${tumNolar.length} sipariş)`);
+        }
+
+        // Tüm etiketleri yeni sekmelerde aç
+        function tumEtiketleriAc() {
+            if (!window._sonEtiketler || window._sonEtiketler.length === 0) return;
+
+            window._sonEtiketler.forEach(etiket => {
+                window.open(etiket.etiket_url, '_blank');
+            });
         }
     </script>
 </body>

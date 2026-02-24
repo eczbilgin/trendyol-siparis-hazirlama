@@ -4,3 +4,4 @@ openpyxl
 selenium
 python-dotenv
 webdriver-manager
+requests

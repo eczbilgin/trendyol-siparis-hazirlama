@@ -3,6 +3,8 @@ from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import os
 import threading
+import base64
+import requests as http_requests
 from dotenv import load_dotenv
 from entegra_cek import excel_cek, INDIRME_KLASORU, durum_mesaj as entegra_canlı_mesaj
 import entegra_cek
@@ -56,6 +58,7 @@ def analiz_yap(df):
 
     urun_ozeti = {}
     siparis_detay = {}  # Sipariş numarasına göre ürünleri grupla
+    urun_siparisler = {}  # Ürün bazında sipariş numaraları
 
     for i in range(len(df)):
         urun = str(urun_sutunu.iloc[i]).strip()
@@ -100,6 +103,13 @@ def analiz_yap(df):
         else:
             urun_ozeti[urun]['paketler'][adet] = 1
 
+        # Ürün bazında sipariş numaralarını topla
+        if siparis_no and siparis_no != 'nan':
+            if urun not in urun_siparisler:
+                urun_siparisler[urun] = []
+            if siparis_no not in urun_siparisler[urun]:
+                urun_siparisler[urun].append(siparis_no)
+
         # Sipariş detayı (karma siparişler için)
         if siparis_no and siparis_no != 'nan':
             if siparis_no not in siparis_detay:
@@ -136,7 +146,8 @@ def analiz_yap(df):
                 else:
                     karma_urun_adetleri[urun_adi]['paketler'][adet] = 1
 
-    # Karma siparişlerdeki adetleri ana özetten çıkar
+    # Karma siparişlerdeki adetleri ve sipariş numaralarını ana özetten çıkar
+    karma_siparis_nolari = set(s['siparis_no'] for s in karma_siparisler)
     for urun_adi, karma_bilgi in karma_urun_adetleri.items():
         if urun_adi in urun_ozeti:
             urun_ozeti[urun_adi]['toplam_adet'] -= karma_bilgi['toplam_adet']
@@ -147,6 +158,9 @@ def analiz_yap(df):
                     urun_ozeti[urun_adi]['paketler'][adet] -= sayi
                     if urun_ozeti[urun_adi]['paketler'][adet] <= 0:
                         del urun_ozeti[urun_adi]['paketler'][adet]
+        # Karma sipariş numaralarını ürün listesinden çıkar
+        if urun_adi in urun_siparisler:
+            urun_siparisler[urun_adi] = [s for s in urun_siparisler[urun_adi] if s not in karma_siparis_nolari]
 
     # Sonuçları liste olarak döndür
     sonuclar = []
@@ -175,7 +189,8 @@ def analiz_yap(df):
             'urun': urun,
             'toplam': bilgi['toplam_adet'],
             'siparis_sayisi': bilgi['siparis_sayisi'],
-            'paketler': paket_listesi
+            'paketler': paket_listesi,
+            'siparis_numaralari': urun_siparisler.get(urun, [])
         })
 
     # Karma siparişlerdeki toplam ürün sayısını hesapla
@@ -184,6 +199,13 @@ def analiz_yap(df):
         for siparis in karma_siparisler
     )
 
+    # Tüm sipariş numaralarını topla (etiket yazdırma için)
+    tum_siparis_numaralari = []
+    for urun_siparis_listesi in urun_siparisler.values():
+        tum_siparis_numaralari.extend(urun_siparis_listesi)
+    tum_siparis_numaralari.extend(list(karma_siparis_nolari))
+    tum_siparis_numaralari = list(set(tum_siparis_numaralari))
+
     ozet = {
         'urun_cesidi': len([u for u in urun_ozeti.keys() if urun_ozeti[u]['toplam_adet'] > 0]),
         'toplam_siparis': toplam_siparis + len(karma_siparisler),
@@ -191,7 +213,7 @@ def analiz_yap(df):
         'karma_siparis_sayisi': len(karma_siparisler)
     }
 
-    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler}, None
+    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler, 'tum_siparis_numaralari': tum_siparis_numaralari}, None
 
 @app.route('/')
 def index():
@@ -414,6 +436,7 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
 
     urun_ozeti = {}
     siparis_detay = {}
+    urun_siparisler = {}  # Ürün bazında sipariş numaraları
 
     for i in range(len(df)):
         urun = str(urun_sutunu.iloc[i]).strip()
@@ -460,6 +483,13 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
         else:
             urun_ozeti[urun]['paketler'][adet] = 1
 
+        # Ürün bazında sipariş numaralarını topla
+        if siparis_no and siparis_no != 'nan':
+            if urun not in urun_siparisler:
+                urun_siparisler[urun] = []
+            if siparis_no not in urun_siparisler[urun]:
+                urun_siparisler[urun].append(siparis_no)
+
         # Sipariş detayı (karma siparişler için)
         if siparis_no and siparis_no != 'nan':
             if siparis_no not in siparis_detay:
@@ -485,7 +515,8 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
                 else:
                     karma_urun_adetleri[urun_adi]['paketler'][a] = 1
 
-    # Karma adetleri ana özetten çıkar
+    # Karma adetleri ve sipariş numaralarını ana özetten çıkar
+    karma_siparis_nolari = set(s['siparis_no'] for s in karma_siparisler)
     for urun_adi, karma_bilgi in karma_urun_adetleri.items():
         if urun_adi in urun_ozeti:
             urun_ozeti[urun_adi]['toplam_adet'] -= karma_bilgi['toplam_adet']
@@ -495,6 +526,9 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
                     urun_ozeti[urun_adi]['paketler'][a] -= sayi
                     if urun_ozeti[urun_adi]['paketler'][a] <= 0:
                         del urun_ozeti[urun_adi]['paketler'][a]
+        # Karma sipariş numaralarını ürün listesinden çıkar
+        if urun_adi in urun_siparisler:
+            urun_siparisler[urun_adi] = [s for s in urun_siparisler[urun_adi] if s not in karma_siparis_nolari]
 
     # Sonuçları oluştur
     sonuclar = []
@@ -515,13 +549,21 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
             'urun': urun,
             'toplam': bilgi['toplam_adet'],
             'siparis_sayisi': bilgi['siparis_sayisi'],
-            'paketler': paket_listesi
+            'paketler': paket_listesi,
+            'siparis_numaralari': urun_siparisler.get(urun, [])
         })
 
     karma_toplam_urun = sum(
         sum(u['adet'] for u in siparis['urunler'])
         for siparis in karma_siparisler
     )
+
+    # Tüm sipariş numaralarını topla (etiket yazdırma için)
+    tum_siparis_numaralari = []
+    for urun_siparis_listesi in urun_siparisler.values():
+        tum_siparis_numaralari.extend(urun_siparis_listesi)
+    tum_siparis_numaralari.extend(list(karma_siparis_nolari))
+    tum_siparis_numaralari = list(set(tum_siparis_numaralari))
 
     ozet = {
         'urun_cesidi': len([u for u in urun_ozeti.keys() if urun_ozeti[u]['toplam_adet'] > 0]),
@@ -530,7 +572,7 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
         'karma_siparis_sayisi': len(karma_siparisler)
     }
 
-    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler}, None
+    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler, 'tum_siparis_numaralari': tum_siparis_numaralari}, None
 
 
 @app.route('/entegra-analiz', methods=['POST'])
@@ -724,6 +766,147 @@ def genel_entegra_analiz():
         return jsonify(sonuc)
     except Exception as e:
         return jsonify({'error': f'Hata: {str(e)}'})
+
+
+# ==================== TRENDYOL API - KARGO ETİKETİ ====================
+
+def trendyol_api_headers():
+    """Trendyol API için gerekli header'ları döndürür"""
+    api_key = os.getenv('TRENDYOL_API_KEY', '')
+    api_secret = os.getenv('TRENDYOL_API_SECRET', '')
+    seller_id = os.getenv('TRENDYOL_SELLER_ID', '')
+
+    if not api_key or not api_secret or not seller_id:
+        return None, 'Trendyol API bilgileri .env dosyasında tanımlı değil!'
+
+    auth_string = base64.b64encode(f"{api_key}:{api_secret}".encode()).decode()
+
+    headers = {
+        'Authorization': f'Basic {auth_string}',
+        'Content-Type': 'application/json',
+        'User-Agent': f'{seller_id} - SelfIntegration'
+    }
+    return headers, None
+
+
+def trendyol_api_get(endpoint):
+    """Trendyol API'ye GET isteği gönderir"""
+    headers, hata = trendyol_api_headers()
+    if hata:
+        return None, hata
+
+    url = f"https://apigw.trendyol.com/integration/{endpoint}"
+    try:
+        response = http_requests.get(url, headers=headers, timeout=30)
+        if response.status_code == 200:
+            return response.json(), None
+        else:
+            return None, f'Trendyol API hatası: {response.status_code} - {response.text[:200]}'
+    except Exception as e:
+        return None, f'Trendyol API bağlantı hatası: {str(e)}'
+
+
+def siparis_kargo_bilgisi(siparis_no):
+    """Sipariş numarasından cargoTrackingNumber ve shipmentPackageId bilgisi çeker"""
+    seller_id = os.getenv('TRENDYOL_SELLER_ID', '')
+    endpoint = f"order/sellers/{seller_id}/orders?orderNumber={siparis_no}"
+    data, hata = trendyol_api_get(endpoint)
+
+    if hata:
+        return None, hata
+
+    content = data.get('content', [])
+    if not content:
+        return None, f'Sipariş bulunamadı: {siparis_no}'
+
+    sonuclar = []
+    for paket in content:
+        tracking = paket.get('cargoTrackingNumber')
+        package_id = paket.get('shipmentPackageId')
+        if tracking:
+            sonuclar.append({
+                'siparis_no': siparis_no,
+                'cargo_tracking_number': tracking,
+                'shipment_package_id': package_id,
+                'kargo_firmasi': paket.get('cargoProviderName', ''),
+                'durum': paket.get('status', '')
+            })
+
+    if not sonuclar:
+        return None, f'Kargo takip numarası bulunamadı: {siparis_no}'
+
+    return sonuclar, None
+
+
+def kargo_etiketi_al(tracking_number):
+    """Tracking number'dan kargo etiketi PDF URL'ini alır"""
+    seller_id = os.getenv('TRENDYOL_SELLER_ID', '')
+    endpoint = f"sellers/{seller_id}/common-label/query?id={tracking_number}"
+    data, hata = trendyol_api_get(endpoint)
+
+    if hata:
+        return None, hata
+
+    etiketler = data.get('data', [])
+    if not etiketler:
+        return None, f'Etiket bulunamadı: {tracking_number}'
+
+    # PDF formatını tercih et
+    for etiket in etiketler:
+        if etiket.get('format') == 'PDF':
+            return etiket.get('label'), None
+
+    # PDF yoksa ilk etiketi döndür
+    return etiketler[0].get('label'), None
+
+
+@app.route('/kargo-etiket', methods=['POST'])
+def kargo_etiket_route():
+    """Sipariş numaralarından kargo etiketlerini çeker"""
+    data = request.get_json()
+    siparis_numaralari = data.get('siparis_numaralari', [])
+
+    if not siparis_numaralari:
+        return jsonify({'error': 'Sipariş numarası belirtilmedi!'})
+
+    # API bilgileri kontrol
+    headers, hata = trendyol_api_headers()
+    if hata:
+        return jsonify({'error': hata})
+
+    etiketler = []
+    hatalar = []
+
+    for siparis_no in siparis_numaralari:
+        # 1. Sipariş bilgisini çek
+        kargo_bilgileri, hata = siparis_kargo_bilgisi(siparis_no)
+        if hata:
+            hatalar.append(hata)
+            continue
+
+        # 2. Her kargo paketi için etiket al
+        for kargo in kargo_bilgileri:
+            tracking = kargo['cargo_tracking_number']
+            etiket_url, hata = kargo_etiketi_al(tracking)
+
+            if hata:
+                hatalar.append(hata)
+                continue
+
+            etiketler.append({
+                'siparis_no': siparis_no,
+                'tracking_number': tracking,
+                'kargo_firmasi': kargo['kargo_firmasi'],
+                'etiket_url': etiket_url
+            })
+
+    return jsonify({
+        'success': True,
+        'etiketler': etiketler,
+        'hatalar': hatalar,
+        'toplam_etiket': len(etiketler),
+        'toplam_hata': len(hatalar)
+    })
 
 
 if __name__ == '__main__':
