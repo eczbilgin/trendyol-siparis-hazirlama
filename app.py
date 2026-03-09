@@ -969,12 +969,19 @@ def hepsiburada_entegra_cek_route():
     if not email or not sifre:
         return jsonify({'error': 'E-posta ve şifre .env dosyasında tanımlı değil!'})
 
+    data = request.get_json() or {}
+    baslangic = data.get('baslangic', '').strip()
+    bitis = data.get('bitis', '').strip()
+
+    if not baslangic or not bitis:
+        return jsonify({'error': 'Başlangıç ve bitiş tarihi seçilmeli!'})
+
     hepsiburada_entegra_durum = {'durum': 'calisiyor', 'mesaj': 'Entegra paneline bağlanılıyor...', 'dosya': None, 'detay': None}
 
     def cek_thread():
         global hepsiburada_entegra_durum
         try:
-            sonuc = excel_cek(email, sifre, headless=False, tarih_filtresi=True)
+            sonuc = excel_cek(email, sifre, headless=False, tarih_filtresi=True, baslangic_tarih=baslangic, bitis_tarih=bitis)
             if sonuc['basarili']:
                 hepsiburada_entegra_durum = {
                     'durum': 'tamamlandi',

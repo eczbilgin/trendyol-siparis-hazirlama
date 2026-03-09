@@ -732,6 +732,17 @@
             <h2>Entegra'dan Otomatik Çek</h2>
             <p style="color: #666; margin-bottom: 15px;">Entegra panelinden HepsiBurada siparişlerini otomatik indir</p>
 
+            <div style="display: flex; gap: 15px; justify-content: center; align-items: center; margin: 15px 0; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <label style="display: block; font-size: 0.85em; color: #666; margin-bottom: 4px;">Başlangıç Tarihi</label>
+                    <input type="date" id="hbBaslangicTarih" style="padding: 8px 12px; border: 2px solid #ff6000; border-radius: 8px; font-size: 1em; outline: none;">
+                </div>
+                <div style="text-align: center;">
+                    <label style="display: block; font-size: 0.85em; color: #666; margin-bottom: 4px;">Bitiş Tarihi</label>
+                    <input type="date" id="hbBitisTarih" style="padding: 8px 12px; border: 2px solid #ff6000; border-radius: 8px; font-size: 1em; outline: none;">
+                </div>
+            </div>
+
             <div style="margin-top: 15px;">
                 <button class="entegra-btn" id="hbEntegraBtn" onclick="hbEntegraCek()" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">🟠 Entegra'dan Çek</button>
             </div>
@@ -1198,6 +1209,13 @@
         // ==================== HEPSİBURADA SİPARİŞLERİ ====================
         let hbEntegraDurumInterval = null;
 
+        // HepsiBurada tarih seçicilerine bugünü varsayılan olarak ata
+        (function() {
+            const bugun = new Date().toISOString().split('T')[0];
+            document.getElementById('hbBitisTarih').value = bugun;
+            document.getElementById('hbBaslangicTarih').value = bugun;
+        })();
+
         const hbFileInput = document.getElementById('hbFileInput');
         const hbFileName = document.getElementById('hbFileName');
         const hbAnalyzeBtn = document.getElementById('hbAnalyzeBtn');
@@ -1256,6 +1274,21 @@
             const statusText = document.getElementById('hbEntegraStatusText');
             const debug = document.getElementById('hbEntegraDebug');
 
+            // Tarih kontrolü
+            const baslangicInput = document.getElementById('hbBaslangicTarih').value;
+            const bitisInput = document.getElementById('hbBitisTarih').value;
+
+            if (!baslangicInput || !bitisInput) {
+                alert('Lütfen başlangıç ve bitiş tarihlerini seçin!');
+                return;
+            }
+
+            // yyyy-MM-dd -> dd.MM.yyyy formatına çevir
+            const [by, bm, bd] = baslangicInput.split('-');
+            const baslangic = `${bd}.${bm}.${by}`;
+            const [sy, sm, sd] = bitisInput.split('-');
+            const bitis = `${sd}.${sm}.${sy}`;
+
             btn.disabled = true;
             btn.textContent = '⏳ Bağlanıyor...';
             status.className = 'entegra-status calisiyor';
@@ -1267,7 +1300,7 @@
                 const response = await fetch('/hepsiburada-entegra-cek', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ baslangic: baslangic, bitis: bitis })
                 });
 
                 const data = await response.json();
