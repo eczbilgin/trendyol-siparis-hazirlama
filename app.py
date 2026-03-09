@@ -16,6 +16,8 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 entegra_durum = {'durum': 'bosta', 'mesaj': '', 'dosya': None, 'detay': None}
 # Genel siparişler için ayrı durum
 genel_entegra_durum = {'durum': 'bosta', 'mesaj': '', 'dosya': None, 'detay': None}
+# HepsiBurada için ayrı durum
+hepsiburada_entegra_durum = {'durum': 'bosta', 'mesaj': '', 'dosya': None, 'detay': None}
 
 def sutun_indeksi(sutun_adi):
     """Excel sütun adını indekse çevirir"""
@@ -782,6 +784,319 @@ def genel_entegra_analiz():
     try:
         df = pd.read_excel(dosya_yolu, header=None)
         sonuc, hata = genel_entegra_analiz_yap(df)
+
+        if hata:
+            return jsonify({'error': hata})
+
+        return jsonify(sonuc)
+    except Exception as e:
+        return jsonify({'error': f'Hata: {str(e)}'})
+
+
+# ==================== HEPSİBURADA ====================
+
+def hepsiburada_analiz_yap(df):
+    """HepsiBurada için Entegra Excel formatını analiz eder
+
+    Filtreler:
+    - Entegrasyon: HepsiBurada
+    - Pazaryeri Durumu: Kargoya Verilecek
+    - Kargoya Son Teslim Tarihi: Bugün veya sonrası
+    """
+    from datetime import datetime, timedelta
+
+    # Bugünün tarihi (saat bilgisi olmadan)
+    bugun = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # İlk satıra bakarak formatı algıla
+    ilk_hucre = str(df.iloc[0, 0]).strip()
+
+    if ilk_hucre == 'ID' or 'Tarih' in str(df.iloc[0, 1]):
+        # Format 1 - Ayrıntılı Excel (Türkçe)
+        siparis_idx = basliga_gore_sutun_bul(df, ['Platform Referans No'])
+        platform_idx = basliga_gore_sutun_bul(df, ['Entegrasyon'])
+        durum_idx = basliga_gore_sutun_bul(df, ['Pazaryeri Durumu'])
+        urun_idx = basliga_gore_sutun_bul(df, ['Ürün İsmi', 'Ürün ismi'])
+        adet_idx = basliga_gore_sutun_bul(df, ['Adet'])
+        kargo_teslim_idx = basliga_gore_sutun_bul(df, ['Kargoya Son Teslim Tarihi', 'Kargo Son Teslim Tarihi'])
+
+        eksik = []
+        if siparis_idx is None: eksik.append('Platform Referans No')
+        if platform_idx is None: eksik.append('Entegrasyon')
+        if durum_idx is None: eksik.append('Pazaryeri Durumu')
+        if urun_idx is None: eksik.append('Ürün İsmi')
+        if adet_idx is None: eksik.append('Adet')
+        # Kargo teslim tarihi opsiyonel - bulunamazsa filtre uygulanmaz
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
+    else:
+        # Format 2 - Normal Excel (İngilizce)
+        siparis_idx = basliga_gore_sutun_bul(df, ['order_number'])
+        platform_idx = basliga_gore_sutun_bul(df, ['entegration'])
+        durum_idx = basliga_gore_sutun_bul(df, ['store_order_status_name'])
+        urun_idx = basliga_gore_sutun_bul(df, ['product_name'])
+        adet_idx = basliga_gore_sutun_bul(df, ['total_product_quantity'])
+        kargo_teslim_idx = basliga_gore_sutun_bul(df, ['cargo_last_delivery_date', 'last_delivery_date'])
+
+        eksik = []
+        if siparis_idx is None: eksik.append('order_number')
+        if platform_idx is None: eksik.append('entegration')
+        if durum_idx is None: eksik.append('store_order_status_name')
+        if urun_idx is None: eksik.append('product_name')
+        if adet_idx is None: eksik.append('total_product_quantity')
+        # Kargo teslim tarihi opsiyonel
+        if eksik:
+            return None, f"Excel'de şu sütunlar bulunamadı: {', '.join(eksik)}"
+
+    urun_sutunu = df.iloc[:, urun_idx]
+    adet_sutunu = df.iloc[:, adet_idx]
+    siparis_sutunu = df.iloc[:, siparis_idx]
+    platform_sutunu = df.iloc[:, platform_idx]
+    durum_sutunu = df.iloc[:, durum_idx]
+    kargo_teslim_sutunu = df.iloc[:, kargo_teslim_idx] if kargo_teslim_idx is not None else None
+
+    urun_ozeti = {}
+    siparis_detay = {}
+
+    for i in range(len(df)):
+        urun = str(urun_sutunu.iloc[i]).strip()
+        siparis_no = str(siparis_sutunu.iloc[i]).strip()
+        platform = str(platform_sutunu.iloc[i]).strip().lower()
+        durum = str(durum_sutunu.iloc[i]).strip().lower()
+
+        if not urun or urun == 'nan' or pd.isna(urun_sutunu.iloc[i]):
+            continue
+
+        # Başlık satırını atla
+        if urun == 'Ürün İsmi' or 'product' in urun.lower() or urun == 'Ürün ismi':
+            continue
+
+        # Sadece HepsiBurada siparişleri
+        if 'hepsiburada' not in platform:
+            continue
+
+        # Sadece "Kargoya verilecek" durumundakiler
+        if 'kargoya verilecek' not in durum:
+            continue
+
+        # Kargoya son teslim tarihi filtresi (bugün veya sonrası)
+        if kargo_teslim_sutunu is not None:
+            kargo_teslim_raw = kargo_teslim_sutunu.iloc[i]
+            try:
+                # Pandas Timestamp veya datetime olabilir
+                if pd.notna(kargo_teslim_raw):
+                    if isinstance(kargo_teslim_raw, str):
+                        # String formatını parse et (dd.mm.yyyy veya yyyy-mm-dd)
+                        kargo_teslim_str = kargo_teslim_raw.strip()
+                        if '.' in kargo_teslim_str:
+                            kargo_teslim = datetime.strptime(kargo_teslim_str.split()[0], '%d.%m.%Y')
+                        elif '-' in kargo_teslim_str:
+                            kargo_teslim = datetime.strptime(kargo_teslim_str.split()[0], '%Y-%m-%d')
+                        else:
+                            kargo_teslim = None
+                    else:
+                        # Pandas Timestamp veya datetime
+                        kargo_teslim = pd.to_datetime(kargo_teslim_raw).to_pydatetime().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                    # Bugünden önceki tarihleri atla
+                    if kargo_teslim and kargo_teslim < bugun:
+                        continue
+            except (ValueError, TypeError):
+                # Tarih parse edilemezse filtre uygulanmaz, sipariş dahil edilir
+                pass
+
+        try:
+            adet = int(float(adet_sutunu.iloc[i]))
+        except (ValueError, TypeError):
+            adet = 1
+
+        # Ürün özeti
+        if urun not in urun_ozeti:
+            urun_ozeti[urun] = {'toplam_adet': 0, 'siparis_sayisi': 0, 'paketler': {}}
+
+        urun_ozeti[urun]['toplam_adet'] += adet
+        urun_ozeti[urun]['siparis_sayisi'] += 1
+
+        if adet in urun_ozeti[urun]['paketler']:
+            urun_ozeti[urun]['paketler'][adet] += 1
+        else:
+            urun_ozeti[urun]['paketler'][adet] = 1
+
+        # Sipariş detayı (karma siparişler için)
+        if siparis_no and siparis_no != 'nan':
+            if siparis_no not in siparis_detay:
+                siparis_detay[siparis_no] = []
+            siparis_detay[siparis_no].append({'urun': urun, 'adet': adet})
+
+    # Karma siparişleri bul
+    karma_siparisler = []
+    karma_urun_adetleri = {}
+
+    for siparis_no, urunler in siparis_detay.items():
+        if len(urunler) > 1:
+            karma_siparisler.append({'siparis_no': siparis_no, 'urunler': urunler})
+            for u in urunler:
+                urun_adi = u['urun']
+                a = u['adet']
+                if urun_adi not in karma_urun_adetleri:
+                    karma_urun_adetleri[urun_adi] = {'toplam_adet': 0, 'siparis_sayisi': 0, 'paketler': {}}
+                karma_urun_adetleri[urun_adi]['toplam_adet'] += a
+                karma_urun_adetleri[urun_adi]['siparis_sayisi'] += 1
+                if a in karma_urun_adetleri[urun_adi]['paketler']:
+                    karma_urun_adetleri[urun_adi]['paketler'][a] += 1
+                else:
+                    karma_urun_adetleri[urun_adi]['paketler'][a] = 1
+
+    # Karma adetleri ana özetten çıkar
+    for urun_adi, karma_bilgi in karma_urun_adetleri.items():
+        if urun_adi in urun_ozeti:
+            urun_ozeti[urun_adi]['toplam_adet'] -= karma_bilgi['toplam_adet']
+            urun_ozeti[urun_adi]['siparis_sayisi'] -= karma_bilgi['siparis_sayisi']
+            for a, sayi in karma_bilgi['paketler'].items():
+                if a in urun_ozeti[urun_adi]['paketler']:
+                    urun_ozeti[urun_adi]['paketler'][a] -= sayi
+                    if urun_ozeti[urun_adi]['paketler'][a] <= 0:
+                        del urun_ozeti[urun_adi]['paketler'][a]
+
+    # Sonuçları oluştur
+    sonuclar = []
+    toplam_siparis = 0
+    toplam_urun = 0
+
+    for urun in sorted(urun_ozeti.keys()):
+        bilgi = urun_ozeti[urun]
+        if bilgi['toplam_adet'] <= 0:
+            continue
+        toplam_siparis += bilgi['siparis_sayisi']
+        toplam_urun += bilgi['toplam_adet']
+        paket_listesi = []
+        for a in sorted(bilgi['paketler'].keys()):
+            if bilgi['paketler'][a] > 0:
+                paket_listesi.append({'adet': a, 'sayi': bilgi['paketler'][a]})
+        sonuclar.append({
+            'urun': urun,
+            'toplam': bilgi['toplam_adet'],
+            'siparis_sayisi': bilgi['siparis_sayisi'],
+            'paketler': paket_listesi
+        })
+
+    karma_toplam_urun = sum(
+        sum(u['adet'] for u in siparis['urunler'])
+        for siparis in karma_siparisler
+    )
+
+    ozet = {
+        'urun_cesidi': len([u for u in urun_ozeti.keys() if urun_ozeti[u]['toplam_adet'] > 0]),
+        'toplam_siparis': toplam_siparis + len(karma_siparisler),
+        'toplam_urun': toplam_urun + karma_toplam_urun,
+        'karma_siparis_sayisi': len(karma_siparisler)
+    }
+
+    return {'urunler': sonuclar, 'ozet': ozet, 'karma_siparisler': karma_siparisler}, None
+
+
+@app.route('/hepsiburada-analiz', methods=['POST'])
+def hepsiburada_analiz():
+    """Manuel yüklenen Excel için HepsiBurada analizi"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Dosya seçilmedi!'})
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Dosya seçilmedi!'})
+
+    if not file.filename.endswith('.xlsx'):
+        return jsonify({'error': 'Sadece .xlsx dosyaları desteklenir!'})
+
+    try:
+        df = pd.read_excel(file, header=None)
+        sonuc, hata = hepsiburada_analiz_yap(df)
+
+        if hata:
+            return jsonify({'error': hata})
+
+        return jsonify(sonuc)
+    except Exception as e:
+        return jsonify({'error': f'Hata: {str(e)}'})
+
+
+@app.route('/hepsiburada-entegra-cek', methods=['POST'])
+def hepsiburada_entegra_cek_route():
+    """HepsiBurada için Entegra'dan Selenium ile Excel çeker"""
+    global hepsiburada_entegra_durum
+
+    if hepsiburada_entegra_durum['durum'] == 'calisiyor':
+        return jsonify({'error': 'Zaten bir indirme işlemi devam ediyor!'})
+
+    email = os.getenv('ENTEGRA_EMAIL', '')
+    sifre = os.getenv('ENTEGRA_SIFRE', '')
+
+    if not email or not sifre:
+        return jsonify({'error': 'E-posta ve şifre .env dosyasında tanımlı değil!'})
+
+    data = request.get_json() or {}
+    baslangic = data.get('baslangic', '').strip()
+    bitis = data.get('bitis', '').strip()
+
+    if not baslangic or not bitis:
+        return jsonify({'error': 'Başlangıç ve bitiş tarihi seçilmeli!'})
+
+    hepsiburada_entegra_durum = {'durum': 'calisiyor', 'mesaj': 'Entegra paneline bağlanılıyor...', 'dosya': None, 'detay': None}
+
+    def cek_thread():
+        global hepsiburada_entegra_durum
+        try:
+            sonuc = excel_cek(email, sifre, headless=False, tarih_filtresi=True, baslangic_tarih=baslangic, bitis_tarih=bitis)
+            if sonuc['basarili']:
+                hepsiburada_entegra_durum = {
+                    'durum': 'tamamlandi',
+                    'mesaj': sonuc['mesaj'],
+                    'dosya': sonuc['dosya'],
+                    'detay': None
+                }
+            else:
+                hepsiburada_entegra_durum = {
+                    'durum': 'hata',
+                    'mesaj': sonuc['mesaj'],
+                    'dosya': None,
+                    'detay': sonuc.get('sayfa_bilgisi')
+                }
+        except Exception as e:
+            hepsiburada_entegra_durum = {
+                'durum': 'hata',
+                'mesaj': f'Beklenmeyen hata: {str(e)}',
+                'dosya': None,
+                'detay': None
+            }
+
+    thread = threading.Thread(target=cek_thread)
+    thread.start()
+
+    return jsonify({'mesaj': 'İndirme başlatıldı, tarayıcı açılacak...'})
+
+
+@app.route('/hepsiburada-entegra-durum')
+def hepsiburada_entegra_durum_route():
+    """HepsiBurada için Entegra indirme durumunu döndürür"""
+    sonuc = dict(hepsiburada_entegra_durum)
+    if sonuc['durum'] == 'calisiyor' and entegra_cek.durum_mesaj:
+        sonuc['mesaj'] = entegra_cek.durum_mesaj
+    return jsonify(sonuc)
+
+
+@app.route('/hepsiburada-entegra-analiz', methods=['POST'])
+def hepsiburada_entegra_analiz():
+    """İndirilen Entegra Excel dosyasını HepsiBurada için analiz eder"""
+    if not hepsiburada_entegra_durum.get('dosya'):
+        return jsonify({'error': 'Henüz indirilmiş dosya yok!'})
+
+    dosya_yolu = hepsiburada_entegra_durum['dosya']
+    if not os.path.exists(dosya_yolu):
+        return jsonify({'error': 'Dosya bulunamadı!'})
+
+    try:
+        df = pd.read_excel(dosya_yolu, header=None)
+        sonuc, hata = hepsiburada_analiz_yap(df)
 
         if hata:
             return jsonify({'error': hata})

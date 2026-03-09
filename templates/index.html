@@ -605,7 +605,8 @@
 
         <!-- Sekmeler -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('trendyol')">🛒 Trendyol Siparişleri</button>
+            <button class="tab-btn active" onclick="switchTab('trendyol')">🛒 Trendyol</button>
+            <button class="tab-btn" onclick="switchTab('hepsiburada')">🟠 HepsiBurada</button>
             <button class="tab-btn" onclick="switchTab('genel')">📦 Genel Siparişler</button>
         </div>
 
@@ -690,6 +691,99 @@
             </table>
         </div>
         </div><!-- Trendyol sekmesi sonu -->
+
+        <!-- HepsiBurada Sekmesi -->
+        <div id="hepsiburada-tab" class="tab-content">
+        <div class="upload-area">
+            <h2>Entegra'dan Otomatik Çek</h2>
+            <p style="color: #666; margin-bottom: 15px;">Entegra panelinden HepsiBurada siparişlerini otomatik indir</p>
+
+            <div style="display: flex; gap: 15px; justify-content: center; align-items: center; margin: 15px 0; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <label style="display: block; font-size: 0.85em; color: #666; margin-bottom: 4px;">Başlangıç Tarihi</label>
+                    <input type="date" id="hbBaslangicTarih" style="padding: 8px 12px; border: 2px solid #ff6000; border-radius: 8px; font-size: 1em; outline: none;">
+                </div>
+                <div style="text-align: center;">
+                    <label style="display: block; font-size: 0.85em; color: #666; margin-bottom: 4px;">Bitiş Tarihi</label>
+                    <input type="date" id="hbBitisTarih" style="padding: 8px 12px; border: 2px solid #ff6000; border-radius: 8px; font-size: 1em; outline: none;">
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button class="entegra-btn" id="hbEntegraBtn" onclick="hbEntegraCek()" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">🟠 Entegra'dan Çek</button>
+            </div>
+
+            <div class="entegra-status" id="hbEntegraStatus">
+                <div id="hbEntegraStatusText"></div>
+                <div class="entegra-debug" id="hbEntegraDebug" style="display:none;"></div>
+            </div>
+
+            <div class="veya-ayirici"><span>VEYA</span></div>
+
+            <h2>Excel Dosyası Yükle</h2>
+            <p style="color: #666; margin-bottom: 20px;">HepsiBurada sipariş Excel dosyanızı (.xlsx) seçin</p>
+
+            <div class="file-input-wrapper">
+                <input type="file" id="hbFileInput" class="file-input" accept=".xlsx">
+                <label for="hbFileInput" class="file-label" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">📁 Dosya Seç</label>
+            </div>
+
+            <div class="file-name" id="hbFileName"></div>
+
+            <br>
+            <button class="analyze-btn" id="hbAnalyzeBtn" disabled style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">🔍 ANALİZ ET</button>
+
+            <div class="loading" id="hbLoading">
+                <div class="spinner" style="border-top-color: #ff6000;"></div>
+                <p style="margin-top: 15px; color: #666;">Analiz ediliyor...</p>
+            </div>
+        </div>
+
+        <div class="results" id="hbResults">
+            <div class="summary-card" style="border-left: 5px solid #ff6000;">
+                <h3 style="border-bottom-color: #ff6000;">📊 HEPSİBURADA ÖZET</h3>
+                <div class="summary-stats">
+                    <div class="stat-box" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">
+                        <div class="number" id="hbUrunCesidi">0</div>
+                        <div class="label">Ürün Çeşidi</div>
+                    </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">
+                        <div class="number" id="hbToplamSiparis">0</div>
+                        <div class="label">Toplam Sipariş</div>
+                    </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">
+                        <div class="number" id="hbToplamUrun">0</div>
+                        <div class="label">Toplam Ürün</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="print-btn" onclick="printHepsiBurada()" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">🖨️ Yazdır</button>
+                </div>
+            </div>
+
+            <div id="hbProductList"></div>
+
+            <!-- Karma Siparişler -->
+            <div class="summary-card" id="hbKarmaSection" style="display:none; border-left: 5px solid #ff6000;">
+                <h3 style="border-bottom-color: #ff6000;">🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)</h3>
+                <div id="hbKarmaList"></div>
+            </div>
+
+            <!-- Yazdırma için kompakt tablo -->
+            <div class="print-header" id="hbPrintHeader"></div>
+            <table class="print-table" id="hbPrintTable">
+                <thead>
+                    <tr>
+                        <th style="width:5%">#</th>
+                        <th style="width:45%">ÜRÜN ADI</th>
+                        <th style="width:10%">TOPLAM</th>
+                        <th style="width:40%">PAKETLER</th>
+                    </tr>
+                </thead>
+                <tbody id="hbPrintTableBody"></tbody>
+            </table>
+        </div>
+        </div><!-- HepsiBurada sekmesi sonu -->
 
         <!-- Genel Sipariş Sekmesi -->
         <div id="genel-tab" class="tab-content">
@@ -1075,6 +1169,331 @@
             }
 
             results.classList.add('show');
+        }
+
+        // ==================== HEPSİBURADA SİPARİŞLERİ ====================
+        let hbEntegraDurumInterval = null;
+
+        // HepsiBurada tarih seçicilerine bugünü varsayılan olarak ata
+        (function() {
+            const bugun = new Date().toISOString().split('T')[0];
+            document.getElementById('hbBitisTarih').value = bugun;
+            document.getElementById('hbBaslangicTarih').value = bugun;
+        })();
+
+        const hbFileInput = document.getElementById('hbFileInput');
+        const hbFileName = document.getElementById('hbFileName');
+        const hbAnalyzeBtn = document.getElementById('hbAnalyzeBtn');
+        const hbLoading = document.getElementById('hbLoading');
+        const hbResults = document.getElementById('hbResults');
+
+        hbFileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                hbFileName.textContent = '📄 ' + this.files[0].name;
+                hbAnalyzeBtn.disabled = false;
+            } else {
+                hbFileName.textContent = '';
+                hbAnalyzeBtn.disabled = true;
+            }
+        });
+
+        hbAnalyzeBtn.addEventListener('click', async function() {
+            const file = hbFileInput.files[0];
+            if (!file) return;
+
+            hbLoading.classList.add('show');
+            hbResults.classList.remove('show');
+            hbAnalyzeBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/hepsiburada-analiz', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                hbLoading.classList.remove('show');
+                hbAnalyzeBtn.disabled = false;
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                showHBAnalysisResults(data);
+
+            } catch (error) {
+                hbLoading.classList.remove('show');
+                hbAnalyzeBtn.disabled = false;
+                alert('Bir hata oluştu: ' + error.message);
+            }
+        });
+
+        async function hbEntegraCek() {
+            const btn = document.getElementById('hbEntegraBtn');
+            const status = document.getElementById('hbEntegraStatus');
+            const statusText = document.getElementById('hbEntegraStatusText');
+            const debug = document.getElementById('hbEntegraDebug');
+
+            // Tarih kontrolü
+            const baslangicInput = document.getElementById('hbBaslangicTarih').value;
+            const bitisInput = document.getElementById('hbBitisTarih').value;
+
+            if (!baslangicInput || !bitisInput) {
+                alert('Lütfen başlangıç ve bitiş tarihlerini seçin!');
+                return;
+            }
+
+            // yyyy-MM-dd -> dd.MM.yyyy formatına çevir
+            const [by, bm, bd] = baslangicInput.split('-');
+            const baslangic = `${bd}.${bm}.${by}`;
+            const [sy, sm, sd] = bitisInput.split('-');
+            const bitis = `${sd}.${sm}.${sy}`;
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Bağlanıyor...';
+            status.className = 'entegra-status calisiyor';
+            status.style.display = 'block';
+            statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;border-top-color:#ff6000;"></div> Entegra paneline bağlanılıyor, tarayıcı açılacak...';
+            debug.style.display = 'none';
+
+            try {
+                const response = await fetch('/hepsiburada-entegra-cek', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ baslangic: baslangic, bitis: bitis })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    status.className = 'entegra-status hata';
+                    statusText.textContent = data.error;
+                    btn.disabled = false;
+                    btn.textContent = '🟠 Entegra\'dan Çek';
+                    return;
+                }
+
+                // Durum kontrolü başlat
+                hbEntegraDurumKontrol();
+
+            } catch (error) {
+                status.className = 'entegra-status hata';
+                statusText.textContent = 'Bağlantı hatası: ' + error.message;
+                btn.disabled = false;
+                btn.textContent = '🟠 Entegra\'dan Çek';
+            }
+        }
+
+        function hbEntegraDurumKontrol() {
+            if (hbEntegraDurumInterval) clearInterval(hbEntegraDurumInterval);
+
+            hbEntegraDurumInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/hepsiburada-entegra-durum');
+                    const data = await response.json();
+
+                    const status = document.getElementById('hbEntegraStatus');
+                    const statusText = document.getElementById('hbEntegraStatusText');
+                    const debug = document.getElementById('hbEntegraDebug');
+                    const btn = document.getElementById('hbEntegraBtn');
+
+                    if (data.durum === 'calisiyor') {
+                        status.className = 'entegra-status calisiyor';
+                        statusText.innerHTML = '<div class="spinner" style="width:25px;height:25px;border-width:3px;display:inline-block;vertical-align:middle;margin-right:10px;border-top-color:#ff6000;"></div> ' + data.mesaj;
+                    } else if (data.durum === 'tamamlandi') {
+                        clearInterval(hbEntegraDurumInterval);
+                        status.className = 'entegra-status tamamlandi';
+                        statusText.textContent = '✅ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🟠 Entegra\'dan Çek';
+
+                        // Otomatik analiz yap
+                        hbEntegraAnaliz();
+                    } else if (data.durum === 'hata') {
+                        clearInterval(hbEntegraDurumInterval);
+                        status.className = 'entegra-status hata';
+                        statusText.textContent = '❌ ' + data.mesaj;
+                        btn.disabled = false;
+                        btn.textContent = '🟠 Entegra\'dan Çek';
+
+                        // Debug bilgisi göster
+                        if (data.detay) {
+                            debug.style.display = 'block';
+                            let debugHTML = '<strong>Sayfa Bilgisi:</strong><br>';
+                            debugHTML += `URL: ${data.detay.url}<br>`;
+                            debugHTML += `Başlık: ${data.detay.title}<br>`;
+                            debug.innerHTML = debugHTML;
+                        }
+                    }
+                } catch (error) {
+                    // Sessizce devam et
+                }
+            }, 2000);
+        }
+
+        async function hbEntegraAnaliz() {
+            hbLoading.classList.add('show');
+
+            try {
+                const response = await fetch('/hepsiburada-entegra-analiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+
+                hbLoading.classList.remove('show');
+
+                if (data.error) {
+                    alert('Analiz hatası: ' + data.error);
+                    return;
+                }
+
+                showHBAnalysisResults(data);
+
+            } catch (error) {
+                hbLoading.classList.remove('show');
+                alert('Analiz hatası: ' + error.message);
+            }
+        }
+
+        function showHBAnalysisResults(data) {
+            // Özet bilgileri güncelle
+            document.getElementById('hbUrunCesidi').textContent = data.ozet.urun_cesidi;
+            document.getElementById('hbToplamSiparis').textContent = data.ozet.toplam_siparis;
+            document.getElementById('hbToplamUrun').textContent = data.ozet.toplam_urun;
+
+            // Ürün listesini oluştur
+            const productList = document.getElementById('hbProductList');
+            const printTableBody = document.getElementById('hbPrintTableBody');
+            const printHeader = document.getElementById('hbPrintHeader');
+            productList.innerHTML = '';
+            printTableBody.innerHTML = '';
+
+            // Yazdırma başlığı
+            const tarih = new Date().toLocaleDateString('tr-TR');
+            printHeader.innerHTML = `HEPSİBURADA SİPARİŞ LİSTESİ - ${tarih}<br>Toplam: ${data.ozet.urun_cesidi} ürün, ${data.ozet.toplam_urun} adet`;
+
+            let siraNo = 1;
+            data.urunler.forEach(urun => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.style.borderLeftColor = '#ff6000';
+
+                let paketlerHTML = '';
+                let paketlerText = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#ffe0cc;">Ürün Adedi</th><th style="border:1px solid #666;padding:2px;background:#ffe0cc;">Paket</th></tr>';
+                urun.paketler.forEach(p => {
+                    paketlerHTML += `<span class="package-item" style="background: linear-gradient(135deg, #ff6000 0%, #ff8c00 100%);">${p.sayi} adet ${p.adet}'li</span>`;
+                    paketlerText += `<tr><td style="border:1px solid #666;padding:2px;text-align:center;">${p.adet}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${p.sayi}</td></tr>`;
+                });
+                paketlerText += '</table>';
+
+                card.innerHTML = `
+                    <div class="product-name" style="color:#ff6000;">📦 ${urun.urun}</div>
+                    <div class="product-info">
+                        <span class="info-badge">Toplam: <strong style="color:#ff6000;">${urun.toplam} adet</strong></span>
+                        <span class="info-badge">Sipariş: <strong style="color:#ff6000;">${urun.siparis_sayisi}</strong></span>
+                    </div>
+                    <div class="packages">
+                        <div class="packages-title" style="color:#ff6000;">🏷️ Paket Hazırlama:</div>
+                        ${paketlerHTML}
+                    </div>
+                `;
+                productList.appendChild(card);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${siraNo}</td>
+                    <td>${urun.urun}</td>
+                    <td><strong>${urun.toplam}</strong></td>
+                    <td>${paketlerText}</td>
+                `;
+                printTableBody.appendChild(row);
+                siraNo++;
+            });
+
+            // Karma siparişleri göster
+            const karmaSection = document.getElementById('hbKarmaSection');
+            const karmaList = document.getElementById('hbKarmaList');
+            karmaList.innerHTML = '';
+
+            if (data.karma_siparisler && data.karma_siparisler.length > 0) {
+                karmaSection.style.display = 'block';
+
+                data.karma_siparisler.forEach(siparis => {
+                    const karmaCard = document.createElement('div');
+                    karmaCard.style.cssText = 'background:#fff5ee;border-radius:10px;padding:15px;margin:10px 0;border-left:4px solid #ff6000;';
+
+                    let urunlerHTML = '';
+                    siparis.urunler.forEach(u => {
+                        urunlerHTML += `<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>${u.urun}</strong> - ${u.adet} adet</div>`;
+                    });
+
+                    karmaCard.innerHTML = `
+                        <div style="font-weight:bold;color:#ff6000;margin-bottom:10px;">📦 Sipariş No: ${siparis.siparis_no}</div>
+                        ${urunlerHTML}
+                    `;
+                    karmaList.appendChild(karmaCard);
+                });
+
+                const separatorRow = document.createElement('tr');
+                separatorRow.innerHTML = `
+                    <td colspan="4" style="background:#ff6000;color:white;text-align:center;font-weight:bold;padding:10px;">
+                        🔀 KARMA SİPARİŞLER (Birden Fazla Ürün İçeren)
+                    </td>
+                `;
+                printTableBody.appendChild(separatorRow);
+
+                data.karma_siparisler.forEach(siparis => {
+                    const karmaRow = document.createElement('tr');
+                    karmaRow.style.backgroundColor = '#fff5ee';
+
+                    let urunAdlariHTML = siparis.urunler.map(u => u.urun).join('<br>');
+                    let toplamAdet = siparis.urunler.reduce((sum, u) => sum + u.adet, 0);
+
+                    let paketDetayHTML = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><tr><th style="border:1px solid #666;padding:2px;background:#ffe0cc;">Ürün</th><th style="border:1px solid #666;padding:2px;background:#ffe0cc;">Adet</th></tr>';
+                    siparis.urunler.forEach(u => {
+                        paketDetayHTML += `<tr><td style="border:1px solid #666;padding:2px;">${u.urun}</td><td style="border:1px solid #666;padding:2px;text-align:center;">${u.adet}</td></tr>`;
+                    });
+                    paketDetayHTML += '</table>';
+
+                    karmaRow.innerHTML = `
+                        <td style="background:#ff6000;color:white;font-weight:bold;">${siraNo}</td>
+                        <td style="font-size:10px;">${urunAdlariHTML}</td>
+                        <td><strong>${toplamAdet}</strong></td>
+                        <td>${paketDetayHTML}</td>
+                    `;
+                    printTableBody.appendChild(karmaRow);
+                    siraNo++;
+                });
+            } else {
+                karmaSection.style.display = 'none';
+            }
+
+            hbResults.classList.add('show');
+        }
+
+        function printHepsiBurada() {
+            // Geçici olarak diğer tabloları gizle, HB tablosunu göster
+            document.getElementById('printTable').style.display = 'none';
+            document.getElementById('printHeader').style.display = 'none';
+            document.getElementById('genelPrintTable').style.display = 'none';
+            document.getElementById('genelPrintHeader').style.display = 'none';
+            document.getElementById('hbPrintTable').style.display = 'table';
+            document.getElementById('hbPrintHeader').style.display = 'block';
+
+            window.print();
+
+            // Geri al
+            document.getElementById('printTable').style.display = '';
+            document.getElementById('printHeader').style.display = '';
+            document.getElementById('hbPrintTable').style.display = 'none';
+            document.getElementById('hbPrintHeader').style.display = 'none';
         }
 
         // ==================== GENEL SİPARİŞLER - ENTEGRA ÇEK ====================

@@ -146,8 +146,14 @@ def siparislere_git(driver):
     return False, "Siparişler sayfası bulunamadı."
 
 
-def tarih_filtrele(driver):
-    """Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık → Ara"""
+def tarih_filtrele(driver, baslangic=None, bitis=None):
+    """Adım 3: Detaylı Filtreleme → Tarih Filtresi → belirtilen aralık → Ara
+
+    Args:
+        driver: Selenium WebDriver
+        baslangic: Başlangıç tarihi (dd.MM.yyyy formatında). None ise 1 hafta önce.
+        bitis: Bitiş tarihi (dd.MM.yyyy formatında). None ise bugün.
+    """
     durum_guncelle('Detayli Filtreleme butonuna tiklaniyor...')
     wait = WebDriverWait(driver, 15)
     time.sleep(2)
@@ -197,13 +203,16 @@ def tarih_filtrele(driver):
         except:
             pass
 
-    # 4. Tarihleri ayarla (1 hafta öncesi - bugün)
+    # 4. Tarihleri ayarla (parametre verilmezse 1 hafta öncesi - bugün)
     durum_guncelle('Tarih araligi ayarlaniyor...')
-    bugun = datetime.now()
-    bir_hafta_once = bugun - timedelta(days=7)
-
-    baslangic_tarih = bir_hafta_once.strftime('%d.%m.%Y')
-    bitis_tarih = bugun.strftime('%d.%m.%Y')
+    if not baslangic or not bitis:
+        bugun = datetime.now()
+        bir_hafta_once = bugun - timedelta(days=7)
+        baslangic_tarih = bir_hafta_once.strftime('%d.%m.%Y')
+        bitis_tarih = bugun.strftime('%d.%m.%Y')
+    else:
+        baslangic_tarih = baslangic
+        bitis_tarih = bitis
 
     # Tarih input'larını bul ve doldur
     try:
@@ -411,14 +420,16 @@ def sayfa_bilgisi_al(driver):
     return bilgi
 
 
-def excel_cek(email, sifre, headless=False, tarih_filtresi=True):
+def excel_cek(email, sifre, headless=False, tarih_filtresi=True, baslangic_tarih=None, bitis_tarih=None):
     """Ana fonksiyon: Entegra'ya giriş yap → Siparişler → Toplu İşlemler → Ayrıntılı Excel
 
     Args:
         email: Entegra email
         sifre: Entegra şifre
         headless: Tarayıcı görünmez modda mı çalışsın
-        tarih_filtresi: True ise 1 haftalık tarih filtresi uygular
+        tarih_filtresi: True ise tarih filtresi uygular
+        baslangic_tarih: Başlangıç tarihi (dd.MM.yyyy). None ise 1 hafta önce.
+        bitis_tarih: Bitiş tarihi (dd.MM.yyyy). None ise bugün.
     """
     driver = None
     try:
@@ -439,7 +450,7 @@ def excel_cek(email, sifre, headless=False, tarih_filtresi=True):
 
         # Adım 3: Detaylı Filtreleme → Tarih Filtresi → 1 haftalık aralık (opsiyonel)
         if tarih_filtresi:
-            basarili, mesaj = tarih_filtrele(driver)
+            basarili, mesaj = tarih_filtrele(driver, baslangic=baslangic_tarih, bitis=bitis_tarih)
             if not basarili:
                 sayfa = sayfa_bilgisi_al(driver)
                 return {'basarili': False, 'mesaj': mesaj, 'sayfa_bilgisi': sayfa, 'adim': 'tarih_filtrele'}
