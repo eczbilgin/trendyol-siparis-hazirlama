@@ -54,9 +54,9 @@ def analiz_yap(df):
     platform_sutunu = df.iloc[:, cg_idx]
     durum_sutunu = df.iloc[:, s_idx]
 
-    urun_ozeti = {}
     siparis_detay = {}  # Sipariş numarasına göre ürünleri grupla
 
+    # Önce sipariş detaylarını oluştur (aynı üründen birden fazla satır varsa birleştir)
     for i in range(len(df)):
         urun = str(urun_sutunu.iloc[i]).strip()
         siparis_no = str(siparis_sutunu.iloc[i]).strip()
@@ -83,31 +83,41 @@ def analiz_yap(df):
         except (ValueError, TypeError):
             continue
 
-        # Ürün özeti
-        if urun not in urun_ozeti:
-            urun_ozeti[urun] = {
-                'toplam_adet': 0,
-                'siparis_sayisi': 0,
-                'paketler': {}
-            }
-
-        urun_ozeti[urun]['toplam_adet'] += adet
-        urun_ozeti[urun]['siparis_sayisi'] += 1
-
-        # Paket gruplama
-        if adet in urun_ozeti[urun]['paketler']:
-            urun_ozeti[urun]['paketler'][adet] += 1
-        else:
-            urun_ozeti[urun]['paketler'][adet] = 1
-
-        # Sipariş detayı (karma siparişler için)
+        # Sipariş detayı (aynı ürünleri birleştir)
         if siparis_no and siparis_no != 'nan':
             if siparis_no not in siparis_detay:
                 siparis_detay[siparis_no] = []
-            siparis_detay[siparis_no].append({
-                'urun': urun,
-                'adet': adet
-            })
+            # Aynı ürün var mı kontrol et, varsa adetini artır
+            urun_bulundu = False
+            for item in siparis_detay[siparis_no]:
+                if item['urun'] == urun:
+                    item['adet'] += adet
+                    urun_bulundu = True
+                    break
+            if not urun_bulundu:
+                siparis_detay[siparis_no].append({
+                    'urun': urun,
+                    'adet': adet
+                })
+
+    # Sipariş detaylarından ürün özetini oluştur (birleştirilmiş adetlerle)
+    urun_ozeti = {}
+    for siparis_no, urunler in siparis_detay.items():
+        for u in urunler:
+            urun = u['urun']
+            adet = u['adet']
+            if urun not in urun_ozeti:
+                urun_ozeti[urun] = {
+                    'toplam_adet': 0,
+                    'siparis_sayisi': 0,
+                    'paketler': {}
+                }
+            urun_ozeti[urun]['toplam_adet'] += adet
+            urun_ozeti[urun]['siparis_sayisi'] += 1
+            if adet in urun_ozeti[urun]['paketler']:
+                urun_ozeti[urun]['paketler'][adet] += 1
+            else:
+                urun_ozeti[urun]['paketler'][adet] = 1
 
     # Karma siparişleri bul (birden fazla ürün içeren)
     karma_siparisler_raw = []
@@ -435,9 +445,9 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
     platform_sutunu = df.iloc[:, platform_idx]
     durum_sutunu = df.iloc[:, durum_idx]
 
-    urun_ozeti = {}
     siparis_detay = {}
 
+    # Önce sipariş detaylarını oluştur (aynı üründen birden fazla satır varsa birleştir)
     for i in range(len(df)):
         urun = str(urun_sutunu.iloc[i]).strip()
         siparis_no = str(siparis_sutunu.iloc[i]).strip()
@@ -471,23 +481,34 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
         except (ValueError, TypeError):
             adet = 1
 
-        # Ürün özeti
-        if urun not in urun_ozeti:
-            urun_ozeti[urun] = {'toplam_adet': 0, 'siparis_sayisi': 0, 'paketler': {}}
-
-        urun_ozeti[urun]['toplam_adet'] += adet
-        urun_ozeti[urun]['siparis_sayisi'] += 1
-
-        if adet in urun_ozeti[urun]['paketler']:
-            urun_ozeti[urun]['paketler'][adet] += 1
-        else:
-            urun_ozeti[urun]['paketler'][adet] = 1
-
-        # Sipariş detayı (karma siparişler için)
+        # Sipariş detayı (aynı ürünleri birleştir)
         if siparis_no and siparis_no != 'nan':
             if siparis_no not in siparis_detay:
                 siparis_detay[siparis_no] = []
-            siparis_detay[siparis_no].append({'urun': urun, 'adet': adet})
+            # Aynı ürün var mı kontrol et, varsa adetini artır
+            urun_bulundu = False
+            for item in siparis_detay[siparis_no]:
+                if item['urun'] == urun:
+                    item['adet'] += adet
+                    urun_bulundu = True
+                    break
+            if not urun_bulundu:
+                siparis_detay[siparis_no].append({'urun': urun, 'adet': adet})
+
+    # Sipariş detaylarından ürün özetini oluştur (birleştirilmiş adetlerle)
+    urun_ozeti = {}
+    for siparis_no, urunler in siparis_detay.items():
+        for u in urunler:
+            urun = u['urun']
+            adet = u['adet']
+            if urun not in urun_ozeti:
+                urun_ozeti[urun] = {'toplam_adet': 0, 'siparis_sayisi': 0, 'paketler': {}}
+            urun_ozeti[urun]['toplam_adet'] += adet
+            urun_ozeti[urun]['siparis_sayisi'] += 1
+            if adet in urun_ozeti[urun]['paketler']:
+                urun_ozeti[urun]['paketler'][adet] += 1
+            else:
+                urun_ozeti[urun]['paketler'][adet] = 1
 
     # Karma siparişleri bul
     karma_siparisler_raw = []
