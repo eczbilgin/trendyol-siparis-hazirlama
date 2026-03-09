@@ -110,12 +110,12 @@ def analiz_yap(df):
             })
 
     # Karma siparişleri bul (birden fazla ürün içeren)
-    karma_siparisler = []
+    karma_siparisler_raw = []
     karma_urun_adetleri = {}  # Karma siparişlerdeki ürün adetlerini takip et
 
     for siparis_no, urunler in siparis_detay.items():
         if len(urunler) > 1:
-            karma_siparisler.append({
+            karma_siparisler_raw.append({
                 'siparis_no': siparis_no,
                 'urunler': urunler
             })
@@ -135,6 +135,29 @@ def analiz_yap(df):
                     karma_urun_adetleri[urun_adi]['paketler'][adet] += 1
                 else:
                     karma_urun_adetleri[urun_adi]['paketler'][adet] = 1
+
+    # Aynı içerikli karma siparişleri grupla
+    karma_gruplar = {}
+    for siparis in karma_siparisler_raw:
+        # İçeriği anahtar olarak kullan (ürün adı ve adet sıralı)
+        icerik_key = tuple(sorted((u['urun'], u['adet']) for u in siparis['urunler']))
+        if icerik_key not in karma_gruplar:
+            karma_gruplar[icerik_key] = {
+                'urunler': siparis['urunler'],
+                'siparis_nolar': [],
+                'adet': 0
+            }
+        karma_gruplar[icerik_key]['siparis_nolar'].append(siparis['siparis_no'])
+        karma_gruplar[icerik_key]['adet'] += 1
+
+    # Grupları listeye dönüştür
+    karma_siparisler = []
+    for icerik_key, grup in karma_gruplar.items():
+        karma_siparisler.append({
+            'urunler': grup['urunler'],
+            'siparis_nolar': grup['siparis_nolar'],
+            'adet': grup['adet']
+        })
 
     # Karma siparişlerdeki adetleri ana özetten çıkar
     for urun_adi, karma_bilgi in karma_urun_adetleri.items():
@@ -467,12 +490,12 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
             siparis_detay[siparis_no].append({'urun': urun, 'adet': adet})
 
     # Karma siparişleri bul
-    karma_siparisler = []
+    karma_siparisler_raw = []
     karma_urun_adetleri = {}
 
     for siparis_no, urunler in siparis_detay.items():
         if len(urunler) > 1:
-            karma_siparisler.append({'siparis_no': siparis_no, 'urunler': urunler})
+            karma_siparisler_raw.append({'siparis_no': siparis_no, 'urunler': urunler})
             for u in urunler:
                 urun_adi = u['urun']
                 a = u['adet']
@@ -484,6 +507,27 @@ def entegra_analiz_yap(df, durum_filtre='kargoya_verilecek'):
                     karma_urun_adetleri[urun_adi]['paketler'][a] += 1
                 else:
                     karma_urun_adetleri[urun_adi]['paketler'][a] = 1
+
+    # Aynı içerikli karma siparişleri grupla
+    karma_gruplar = {}
+    for siparis in karma_siparisler_raw:
+        icerik_key = tuple(sorted((u['urun'], u['adet']) for u in siparis['urunler']))
+        if icerik_key not in karma_gruplar:
+            karma_gruplar[icerik_key] = {
+                'urunler': siparis['urunler'],
+                'siparis_nolar': [],
+                'adet': 0
+            }
+        karma_gruplar[icerik_key]['siparis_nolar'].append(siparis['siparis_no'])
+        karma_gruplar[icerik_key]['adet'] += 1
+
+    karma_siparisler = []
+    for icerik_key, grup in karma_gruplar.items():
+        karma_siparisler.append({
+            'urunler': grup['urunler'],
+            'siparis_nolar': grup['siparis_nolar'],
+            'adet': grup['adet']
+        })
 
     # Karma adetleri ana özetten çıkar
     for urun_adi, karma_bilgi in karma_urun_adetleri.items():

@@ -1051,7 +1051,7 @@
                 siraNo++;
             });
 
-            // Karma siparişleri göster
+            // Karma siparişleri göster (aynı içerikli olanlar gruplanmış)
             const karmaSection = document.getElementById('karmaSection');
             const karmaList = document.getElementById('karmaList');
             karmaList.innerHTML = '';
@@ -1068,8 +1068,13 @@
                         urunlerHTML += `<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>${u.urun}</strong> - ${u.adet} adet</div>`;
                     });
 
+                    // Adet bilgisi (aynı içerikli kaç sipariş var)
+                    const adetBadge = siparis.adet > 1
+                        ? `<span style="background:#e67e22;color:white;padding:3px 10px;border-radius:15px;font-size:0.9em;margin-left:10px;">${siparis.adet} adet</span>`
+                        : '';
+
                     karmaCard.innerHTML = `
-                        <div style="font-weight:bold;color:#e67e22;margin-bottom:10px;">📦 Sipariş No: ${siparis.siparis_no}</div>
+                        <div style="font-weight:bold;color:#e67e22;margin-bottom:10px;">📦 Karma Sipariş ${adetBadge}</div>
                         ${urunlerHTML}
                     `;
                     karmaList.appendChild(karmaCard);
@@ -1099,7 +1104,7 @@
                     karmaRow.innerHTML = `
                         <td style="background:#e67e22;color:white;font-weight:bold;">${siraNo}</td>
                         <td style="font-size:10px;">${urunAdlariHTML}</td>
-                        <td><strong>${toplamAdet}</strong></td>
+                        <td><strong>${toplamAdet}</strong> (x${siparis.adet})</td>
                         <td>${paketDetayHTML}</td>
                     `;
                     printTableBody.appendChild(karmaRow);
